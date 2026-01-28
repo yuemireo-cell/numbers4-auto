@@ -26,44 +26,59 @@
     <input id="hint2" placeholder="4・1・9・5 みたいに入力（空でもOK）" inputmode="numeric" />
   </div>
 
-  <button onclick="generateFromHints()">ヒントで生成（48＋2桁）</button>
-  <button onclick="generateRandom()">ヒントなし生成（48＋ランダム2桁）</button>
+  <button onclick="generateFromHints()">ヒントで生成（軸なし）</button>
+<button onclick="generateRandom()">ヒントなし生成（完全ランダム）</button>
 
   <div id="result"></div>
 
   <script>
-    function extractDigits(str) {
-      // 0-9 だけ抜き出して配列にする
-      const m = (str || "").match(/\d/g);
-      return m ? m : [];
-    }
+function extractDigits(str) {
+  return (str.match(/\d/g) || []);
+}
 
-    function pick(arr) {
-      return arr[Math.floor(Math.random() * arr.length)];
-    }
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-    function generateRandom() {
-      let num = "48";
-      for (let i = 0; i < 2; i++) num += Math.floor(Math.random() * 10);
-      document.getElementById("result").textContent = num;
-    }
+// 完全ランダム（軸なし）
+function generateRandom() {
+  let num = "";
+  for (let i = 0; i < 4; i++) {
+    num += Math.floor(Math.random() * 10);
+  }
+  document.getElementById("result").textContent = num;
+}
 
-    function generateFromHints() {
-      const h1 = extractDigits(document.getElementById("hint1").value);
-      const h2 = extractDigits(document.getElementById("hint2").value);
+// ヒントあり生成（自動絞り込み・軸なし）
+function generateFromHints() {
+  const h1 = extractDigits(document.getElementById("hint1").value);
+  const h2 = extractDigits(document.getElementById("hint2").value);
 
-      // どっちかが空なら「ヒントなし」に自動フォールバック
-      if (h1.length === 0 || h2.length === 0) {
-        generateRandom();
-        return;
-      }
+  let pool = [];
 
-      // ヒント1から1つ、ヒント2から1つ選んで 48 + (a)(b)
-      const a = pick(h1);
-      const b = pick(h2);
+  // 両方あれば共通数字
+  if (h1.length && h2.length) {
+    pool = h1.filter(n => h2.includes(n));
+  }
 
-      document.getElementById("result").textContent = "48" + a + b;
-    }
+  // 共通がなければ全部まとめる
+  if (pool.length === 0) {
+    pool = [...new Set([...h1, ...h2])];
+  }
+
+  // それでも空なら完全ランダム
+  if (pool.length === 0) {
+    generateRandom();
+    return;
+  }
+
+  let num = "";
+  for (let i = 0; i < 4; i++) {
+    num += pick(pool);
+  }
+
+  document.getElementById("result").textContent = num;
+}
   </script>
 </body>
 </html>
