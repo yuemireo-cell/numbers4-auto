@@ -3,20 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>テスト</title>
+<title>ナンバーズ4 完成版</title>
+<style>
+body{font-family:sans-serif;padding:16px}
+input,button{font-size:16px;padding:8px;width:100%;margin:6px 0}
+button{background:#111;color:#fff;border-radius:20px}
+pre{background:#f7f7f7;padding:12px;border-radius:12px}
+h2{margin-top:20px}
+</style>
 </head>
 <body>
 
-<h1>動作テスト</h1>
+<h1>ナンバーズ4 完成版</h1>
 
-<button onclick="test()">ここを押す</button>
+<input id="hint1" placeholder="ヒント1 例：168">
+<input id="hint2" placeholder="ヒント2 例：3920">
+<input id="prev" placeholder="前回 例：5105">
+<input id="prev2" placeholder="前々回 例：4588">
+<textarea id="recent" placeholder="直近10回 4桁を続けて貼る"></textarea>
 
-<p id="out"></p>
+<button onclick="generate()">番号を生成する</button>
+
+<h2>ストレート（ランキング）</h2>
+<pre id="straight"></pre>
+
+<h2>セット（ランキング）</h2>
+<pre id="set"></pre>
 
 <script>
-function test(){
-  document.getElementById("out").textContent =
-    "生成OK：" + Math.floor(Math.random()*10000).toString().padStart(4,"0");
+const ura={0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
+
+function d(str){return (str||"").match(/\d/g)||[]}
+
+function scoreDigits(){
+  const s=Array(10).fill(0);
+  d(document.getElementById("recent").value).forEach(x=>s[x]+=1);
+  d(document.getElementById("prev").value).forEach(x=>s[x]+=3);
+  d(document.getElementById("prev2").value).forEach(x=>s[x]+=2);
+  return s;
+}
+
+function chooseAxis(h1,h2,s){
+  const c=h1.filter(x=>h2.includes(x));
+  if(c.length>=2) return c.slice(0,2);
+  if(c.length===1){
+    let b=[...h1,...h2].filter(x=>x!==c[0])
+      .sort((a,b)=>s[b]-s[a])[0];
+    return [c[0],b];
+  }
+  const all=[...h1,...h2];
+  return all.sort((a,b)=>s[b]-s[a]).slice(0,2);
+}
+
+function buildPool(h1,h2,s){
+  let p=[...h1,...h2];
+  Object.keys(ura).forEach(k=>p.push(ura[k]));
+  p.forEach(x=>{if(x>0)p.push(x-1);if(x<9)p.push(+x+1)});
+  Object.keys(s).forEach(k=>{for(let i=0;i<s[k];i++)p.push(k)});
+  return [...new Set(p)];
+}
+
+function rank(nums){
+  return nums.map(n=>{
+    let sc=0;
+    const a=n.split("").map(Number);
+    for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){
+      if(a[i]+a[j]===9)sc+=3;
+      if(Math.abs(a[i]-a[j])===1)sc+=2;
+    }
+    return {n,sc};
+  }).sort((a,b)=>b.sc-a.sc);
+}
+
+function generate(){
+  const h1=d(hint1.value), h2=d(hint2.value);
+  const s=scoreDigits();
+  const axis=chooseAxis(h1,h2,s);
+  const pool=buildPool(h1,h2,s);
+
+  let list=[];
+  while(list.length<100){
+    let n=[axis[0],axis[1]];
+    while(n.length<4)n.push(pool[Math.floor(Math.random()*pool.length)]);
+    list.push(n.join(""));
+  }
+
+  const ranked=rank([...new Set(list)]);
+  document.getElementById("straight").textContent=
+    ranked.slice(0,10).map((x,i)=>`${i+1}. ${x.n}`).join("\n");
+  document.getElementById("set").textContent=
+    ranked.slice(0,10).map((x,i)=>`${i+1}. ${x.n.split("").sort(()=>Math.random()-0.5).join("")}`).join("\n");
 }
 </script>
 
