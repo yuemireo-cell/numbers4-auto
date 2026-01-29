@@ -87,12 +87,38 @@ function generate(){
     while(n.length<4)n.push(pool[Math.floor(Math.random()*pool.length)]);
     list.push(n.join(""));
   }
+// ===== ランキング表示（おすすめ強度つき）=====
+function tierLabel(score, best){
+  if(best <= 0) return { badge:"☆", label:"弱" };
+  const r = score / best;
 
-  const ranked=rank([...new Set(list)]);
-  document.getElementById("straight").textContent=
-    ranked.slice(0,10).map((x,i)=>`${i+1}. ${x.n}`).join("\n");
-  document.getElementById("set").textContent=
-    ranked.slice(0,10).map((x,i)=>`${i+1}. ${x.n.split("").sort(()=>Math.random()-0.5).join("")}`).join("\n");
+  if(r >= 0.92) return { badge:"★★★", label:"強" };
+  if(r >= 0.86) return { badge:"★★",  label:"中" };
+  return { badge:"☆", label:"弱" };
+}
+
+function formatRanked(ranked, limit = 10){
+  if(!ranked || ranked.length === 0) return "";
+
+  const best = ranked[0].sc;
+  return ranked.slice(0, limit).map((r, i) => {
+    const t = tierLabel(r.sc, best);
+    return `${i+1}位  ${t.badge}［${t.label}］ ${r.n}`;
+  }).join("\n");
+}
+
+// ranked は既に作られている前提
+document.getElementById("straight").textContent =
+  formatRanked(ranked, 10);
+
+document.getElementById("set").textContent =
+  formatRanked(
+    ranked.map(r => ({
+      n: r.n.split("").sort().join(""),
+      sc: r.sc
+    })),
+    10
+  );
 }// ===== ランキング表示用（強弱＋★）=====
 function tierLabel(score, best){
   if(best <= 0) return { badge:"★", level:"弱" };
