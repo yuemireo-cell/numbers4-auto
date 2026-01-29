@@ -93,6 +93,24 @@ function generate(){
     ranked.slice(0,10).map((x,i)=>`${i+1}. ${x.n}`).join("\n");
   document.getElementById("set").textContent=
     ranked.slice(0,10).map((x,i)=>`${i+1}. ${x.n.split("").sort(()=>Math.random()-0.5).join("")}`).join("\n");
+}// ===== ランキング表示用（強弱＋★）=====
+function tierLabel(score, best){
+  if(best <= 0) return { badge:"★", level:"弱" };
+  const r = score / best;
+
+  if(r >= 0.92) return { badge:"★★★", level:"強" };
+  if(r >= 0.86) return { badge:"★★", level:"中" };
+  return { badge:"★", level:"弱" };
+}
+
+function formatRankedList(ranked, limit = 10){
+  if(!ranked || ranked.length === 0) return "";
+
+  const best = ranked[0].sc;
+  return ranked.slice(0, limit).map((r, i) => {
+    const t = tierLabel(r.sc, best);
+    return `${i+1}位  ${t.badge} ${t.level}  ${r.num}`;
+  }).join("\n");
 }
 </script>
 
