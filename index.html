@@ -1,154 +1,797 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ナンバーズ4 ストレート予想（完成版）</title>
-
-<style>
-body{
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
-  padding:16px;
-  max-width:900px;
-  margin:auto;
-}
-h1{font-size:32px;margin-bottom:16px}
-
-input,button{
-  width:100%;
-  padding:14px;
-  font-size:16px;
-  border-radius:14px;
-  border:1px solid #ddd;
-  margin:6px 0;
-}
-button{
-  background:#111;
-  color:#fff;
-  font-weight:900;
-  border:none;
-}
-
-.box{
-  background:#fafafa;
-  border:1px solid #eee;
-  border-radius:16px;
-  padding:14px;
-  margin-bottom:16px;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap:10px;
-}
-@media(max-width:600px){
-  .grid{grid-template-columns:1fr 1fr;}
-}
-
-.cell{
-  border:2px solid #111;
-  border-radius:14px;
-  padding:10px;
-  background:#fff;
-}
-.cell h3{
-  margin:0 0 8px;
-  text-align:center;
-}
-.num{
-  font-size:26px;
-  font-weight:900;
-  text-align:center;
-  margin:4px 0;
-}
-.score{
-  font-size:12px;
-  color:#666;
-  text-align:center;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ナンバーズ4 完成版</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:16px;max-width:920px;margin:auto}
+    h1{font-size:34px;margin:10px 0 18px}
+    input,button{font-size:16px;padding:12px;width:100%;box-sizing:border-box;margin:8px 0;border-radius:14px;border:1px solid #e5e5e5}
+    button{background:#111;color:#fff;border:none;border-radius:999px;padding:16px;font-weight:900}
+    button.ghost{background:#fff;color:#111;border:1px solid #e5e5e5}
+    .box{background:#fafafa;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px}
+    .label{font-weight:900;margin-top:6px}
+    pre{white-space:pre-wrap;background:#f7f7f7;border-radius:14px;padding:12px;border:1px solid #eee}
+    .day{font-weight:900;margin:8px 0 0}
+    .note{color:#666;font-size:12px;margin-top:6px;line-height:1.55}
+    h2{margin-top:22px}
+    h3{margin:12px 0 6px}
+    .resultBox{background:#fff;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px}
+    .big{font-size:18px;font-weight:900}
+    .ok{color:#0a7;font-weight:900}
+    .warn{color:#b00020;font-weight:900}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .row > *{flex:1 1 220px}
+    .tiny{font-size:12px;color:#666}
+    .pill{display:inline-block;border:1px solid #eee;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;color:#333}
+    .divider{height:1px;background:#eee;margin:10px 0}
+    /* ストレート予想（千百十一） */
+    .posGrid{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap:12px;
+      margin-top:12px;
+    }
+    @media (max-width: 760px){
+      .posGrid{grid-template-columns: repeat(2, minmax(160px, 1fr));}
+    }
+    @media (max-width: 420px){
+      .posGrid{grid-template-columns: 1fr;}
+    }
+    .posCard{
+      background:#fff;
+      border:2px solid #111;
+      border-radius:18px;
+      padding:12px 12px 10px;
+    }
+    .posTitle{font-weight:900;font-size:18px;margin:2px 0 10px}
+    .cand{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .candRow{
+      display:flex;
+      align-items:baseline;
+      justify-content:center;
+      flex-direction:column;
+      gap:2px;
+      padding:8px 0;
+      border-top:1px solid #eee;
+    }
+    .candRow:first-child{border-top:none}
+    .candNum{font-size:34px;font-weight:900;line-height:1}
+    .candScore{font-size:14px;color:#666}
+    .btnStack{display:flex;gap:10px;flex-wrap:wrap}
+    .btnStack button{flex:1 1 220px}
+  </style>
 </head>
-
 <body>
 
-<h1>⭐ ストレート予想（加点式）</h1>
+  <h1>ナンバーズ4 完成版</h1>
 
-<div class="box">
-  <input id="hit1" inputmode="numeric" placeholder="ヒント1（例：168）">
-  <input id="hit2" inputmode="numeric" placeholder="ヒント2（例：3920）">
-  <input id="prev" inputmode="numeric" placeholder="前回（例：9827）" maxlength="4">
+  <div class="box">
+    <div class="label">ヒント1（例：168 / 1・6・8）</div>
+    <input id="hint1" inputmode="numeric" placeholder="ヒント1 例：168">
 
-  <button onclick="saveResult()">📥 抽選結果を保存</button>
-  <button onclick="analyze()">🔮 ストレート予想</button>
-</div>
+    <div class="label">ヒント2（例：3920 / 3・9・2・0）</div>
+    <input id="hint2" inputmode="numeric" placeholder="ヒント2 例：3920">
 
-<div class="grid" id="table"></div>
+    <div class="label">前回（任意）</div>
+    <input id="prev" inputmode="numeric" placeholder="前回 例：5105" maxlength="4">
+
+    <div class="label">前々回（任意）</div>
+    <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4">
+
+    <div class="note">
+      ※「直近10回」欄は廃止。<strong>保存した過去100回</strong>を内臓データとして解析に使う。<br>
+      ※同じ入力＋同じ保存データなら何回押しても同じ結果（ブレない）<br>
+      ※18時ギリギリのリハーサル数字は保存しない（ゆうちゃん方針）
+    </div>
+
+    <div class="btnStack">
+      <button type="button" onclick="generateAll()">🔮 予想を生成する</button>
+      <button type="button" class="ghost" onclick="openStorageTools()">🧠 保存データ（内臓）ツール</button>
+    </div>
+
+    <div id="storageHint" class="tiny" style="margin-top:6px;"></div>
+  </div>
+
+  <div class="resultBox">
+    <div class="label">当選番号（結果が出たらここに4桁）</div>
+    <input id="win" inputmode="numeric" placeholder="例：7263" maxlength="4">
+
+    <div class="btnStack">
+      <button type="button" onclick="saveDraw()">📥 抽選結果を保存（最新100回に追記）</button>
+      <button type="button" class="ghost" onclick="judge()">✅ 結果を判定する</button>
+    </div>
+
+    <div id="judgeOut" class="mono" style="margin-top:10px;"></div>
+    <div class="note">※判定は「ストレート＋セット」両方を見る（ゆうちゃん指定）</div>
+
+    <div id="storageTools" style="display:none;margin-top:12px;">
+      <div class="divider"></div>
+      <div class="label">保存データ管理（表には出さない / 内臓）</div>
+      <div class="note">
+        ・保存は端末内（localStorage）<br>
+        ・最大100回をキープ：101回目から古い1件を自動で削除
+      </div>
+
+      <div class="row">
+        <button type="button" class="ghost" onclick="exportHistory()">📤 100回をテキストで書き出し（コピー用）</button>
+        <button type="button" class="ghost" onclick="importHistory()">📥 テキストから一括取り込み</button>
+      </div>
+
+      <div class="label">取り込み用（貼り付け欄）</div>
+      <input id="bulk" placeholder="例：9827→6120→4588→7964 ...（数字だけ拾う）" />
+
+      <div class="row">
+        <button type="button" class="ghost" onclick="clearHistory()">🗑 保存100回を全消し</button>
+        <button type="button" class="ghost" onclick="closeStorageTools()">閉じる</button>
+      </div>
+
+      <pre id="historyOut" class="mono" style="display:none;margin-top:10px;"></pre>
+    </div>
+  </div>
+
+  <h2>ストレート予想（千/百/十/一）</h2>
+  <div class="note">
+    ここは「前回を写すだけ」にならないように、<strong>保存100回</strong>の位置別頻度＋直近重み＋裏数字＋ズレ（ナンちゃん加点）でスコア化して、各桁の候補を4つ出す。
+  </div>
+
+  <div class="posGrid">
+    <div class="posCard">
+      <div class="posTitle">千の位</div>
+      <div id="pos1000" class="cand"></div>
+    </div>
+    <div class="posCard">
+      <div class="posTitle">百の位</div>
+      <div id="pos100" class="cand"></div>
+    </div>
+    <div class="posCard">
+      <div class="posTitle">十の位</div>
+      <div id="pos10" class="cand"></div>
+    </div>
+    <div class="posCard">
+      <div class="posTitle">一の位</div>
+      <div id="pos1" class="cand"></div>
+    </div>
+  </div>
+
+  <h2>ストレート（ランキング）</h2>
+  <div id="dayPower" class="day"></div>
+
+  <h3>本命（強）</h3>
+  <pre id="straightMain">（ここに出ます）</pre>
+
+  <h3>保険（中・弱）</h3>
+  <pre id="straightIns">（ここに出ます）</pre>
+
+  <h2>セット（ランキング）</h2>
+
+  <h3>本命（強）</h3>
+  <pre id="setMain">（ここに出ます）</pre>
+
+  <h3>保険（中・弱）</h3>
+  <pre id="setIns">（ここに出ます）</pre>
 
 <script>
-const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
-const KEY = "numbers4_history";
+  // =========================
+  // 0) 内臓保存（過去100回）
+  // =========================
+  const STORAGE_KEY = "n4_history_v1"; // 4桁文字列の配列（最新→古い）
+  function digits(str){ return (str || "").match(/\d/g) || []; }
 
-function getHistory(){
-  return JSON.parse(localStorage.getItem(KEY) || "[]");
-}
-
-function saveResult(){
-  const v = document.getElementById("prev").value;
-  if(!/^\d{4}$/.test(v)) return alert("4桁で入れてね");
-  let h = getHistory();
-  h.unshift(v);
-  if(h.length > 100) h.pop();
-  localStorage.setItem(KEY, JSON.stringify(h));
-  alert("保存OK（現在 " + h.length + " 回）");
-}
-
-function analyze(){
-  const hist = getHistory();
-  const score = Array.from({length:4},()=>Array(10).fill(0));
-
-  // 過去100回
-  hist.forEach(n=>{
-    [...n].forEach((d,i)=>score[i][+d]++);
-  });
-
-  // 前回
-  const prev = document.getElementById("prev").value;
-  if(/^\d{4}$/.test(prev)){
-    [...prev].forEach((d,i)=>score[i][+d]+=8);
+  function normalize4(str){
+    const d = digits(str).slice(0,4);
+    if(d.length !== 4) return null;
+    return d.join("");
   }
 
-  // ヒント + 裏
-  [hit1.value, hit2.value].forEach(h=>{
-    [...new Set((h.match(/\d/g)||[]))].forEach(d=>{
-      for(let i=0;i<4;i++){
-        score[i][+d]+=3;
-        score[i][ura[d]]+=5;
+  function loadHistory(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      if(!Array.isArray(arr)) return [];
+      return arr.map(x=>normalize4(String(x))).filter(Boolean).slice(0,100);
+    }catch(e){
+      return [];
+    }
+  }
+  function saveHistory(arr){
+    const clean = (arr||[]).map(x=>normalize4(String(x))).filter(Boolean).slice(0,100);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    updateStorageHint();
+  }
+  function pushHistory(num4){
+    const cur = loadHistory();
+    const n = normalize4(num4);
+    if(!n) return false;
+    cur.unshift(n);
+    const next = cur.slice(0,100);
+    saveHistory(next);
+    return true;
+  }
+
+  function updateStorageHint(){
+    const n = loadHistory().length;
+    const el = document.getElementById("storageHint");
+    el.innerHTML = `<span class="pill">内臓保存：${n}件 / 100件</span>`;
+  }
+
+  function openStorageTools(){
+    document.getElementById("storageTools").style.display = "block";
+    document.getElementById("historyOut").style.display = "none";
+  }
+  function closeStorageTools(){
+    document.getElementById("storageTools").style.display = "none";
+  }
+
+  function exportHistory(){
+    const h = loadHistory();
+    const pre = document.getElementById("historyOut");
+    pre.style.display = "block";
+    pre.textContent = h.join("→");
+  }
+
+  function importHistory(){
+    const raw = document.getElementById("bulk").value || "";
+    const list = [];
+    const only = digits(raw).join("");
+    for(let i=0;i+3<only.length;i+=4){
+      const n = only.slice(i,i+4);
+      if(n.length===4) list.push(n);
+    }
+    if(list.length===0){
+      alert("取り込み失敗：4桁が見つからないよ");
+      return;
+    }
+    saveHistory(list.slice(0,100));
+    alert(`取り込みOK：${Math.min(list.length,100)}件 保存した`);
+  }
+
+  function clearHistory(){
+    if(confirm("保存100回を全部消す？（元に戻せない）")){
+      localStorage.removeItem(STORAGE_KEY);
+      updateStorageHint();
+      alert("消したよ");
+    }
+  }
+
+  // ✅ 追加：保存ボタンで prev/prev2 を自動更新（手間ゼロ）
+  function autoUpdatePrevFields(savedWin){
+    const prevEl = document.getElementById("prev");
+    const prev2El = document.getElementById("prev2");
+
+    const currentPrev = normalize4(prevEl.value); // 元の前回（空でもOK）
+    // 前々回 ← 前回、前回 ← 今回保存
+    if(currentPrev){
+      prev2El.value = currentPrev;
+    }
+    prevEl.value = savedWin;
+  }
+
+  function saveDraw(){
+    const win = normalize4(document.getElementById("win").value);
+    if(!win){
+      alert("当選番号は4桁で入れてね");
+      return;
+    }
+
+    // 1) 内臓100回に追記
+    pushHistory(win);
+
+    // 2) 前回/前々回を自動更新（ここが追加）
+    autoUpdatePrevFields(win);
+
+    // 3) メッセージ
+    const out = document.getElementById("judgeOut");
+    out.innerHTML =
+      `<span class="ok">保存OK</span>：<span class="mono">${win}</span> を内臓データに追記。` +
+      `さらに <span class="mono">前回</span> を自動更新したよ。` +
+      `必要なら「予想を生成する」で最新反映してね。`;
+  }
+
+  // =========================
+  // 1) 裏数字（ゆうちゃん定義）
+  // =========================
+  const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
+
+  // ナンちゃん加点：ズレ
+  function zure1(d){ return [((d+1)%10), ((d+9)%10)]; } // ±1
+  function zure2(d){ return [((d+2)%10), ((d+8)%10)]; } // ±2
+
+  // =========================
+  // 2) 状態保持（判定に使う）
+  // =========================
+  const STATE = {
+    axis: "48",
+    topStraightRows: [],
+    topSetRows: [],
+    straightMain: [],
+    straightIns: [],
+    setMain: [],
+    setIns: [],
+  };
+
+  // =========================
+  // 3) 安定乱数（同入力＋同保存＝同結果）
+  // =========================
+  function hash32(str){
+    let h = 2166136261;
+    for(let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function mulberry32(seed){
+    return function(){
+      let t = seed += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function pick(pool, rand){
+    return pool[Math.floor(rand() * pool.length)];
+  }
+  function uniq(arr){
+    const s = new Set(), out=[];
+    for(const x of arr){ if(!s.has(x)){ s.add(x); out.push(x); } }
+    return out;
+  }
+
+  // =========================
+  // 4) 保存100回 → 解析コア
+  // =========================
+  function argmax(arr){
+    if(!arr || arr.length===0) return null;
+    let best = -Infinity, bi = 0;
+    for(let i=0;i<arr.length;i++){
+      if(arr[i] > best){ best = arr[i]; bi = i; }
+    }
+    return bi;
+  }
+
+  // 位置別（千/百/十/一）
+  function buildPositionScores(){
+    const hist = loadHistory(); // 最新→古い
+    const scores = [
+      Array(10).fill(0), // 千
+      Array(10).fill(0), // 百
+      Array(10).fill(0), // 十
+      Array(10).fill(0), // 一
+    ];
+
+    const recentN = Math.min(20, hist.length);
+
+    for(let idx=0; idx<hist.length; idx++){
+      const n = hist[idx];
+      const w = (idx < recentN) ? 2 : 1;
+      for(let pos=0; pos<4; pos++){
+        const d = +n[pos];
+        scores[pos][d] += w;
       }
+    }
+
+    // ナンちゃん加点（位置別）
+    for(let pos=0; pos<4; pos++){
+      const arr = scores[pos];
+      const topDigit = argmax(arr);
+      if(topDigit !== null){
+        const u = ura[topDigit];
+        if(u !== undefined) arr[u] += 2;           // 裏
+        zure1(topDigit).forEach(x=>arr[x]+=2);     // 1ズレ
+        zure2(topDigit).forEach(x=>arr[x]+=1);     // 2ズレ（弱め）
+      }
+    }
+
+    return scores;
+  }
+
+  // 全体（0-9）
+  function scoreDigitsFromHistory(){
+    const hist = loadHistory();
+    const s = Array(10).fill(0);
+    const recentN = Math.min(20, hist.length);
+
+    for(let idx=0; idx<hist.length; idx++){
+      const n = hist[idx];
+      const w = (idx < recentN) ? 2 : 1;
+      for(const ch of n) s[+ch] += w;
+    }
+
+    const top = argmax(s);
+    if(top !== null){
+      const u = ura[top];
+      if(u !== undefined) s[u] += 2;
+      zure1(top).forEach(x=>s[x]+=2);
+      zure2(top).forEach(x=>s[x]+=1);
+    }
+
+    return s;
+  }
+
+  // =========================
+  // 5) ヒントは「必ず2つだけ」
+  // =========================
+  function pick2FromHint(meStr, s, prevStr, prev2Str, otherStr){
+    const me = uniq(digits(meStr)).map(Number);
+    const other = new Set(uniq(digits(otherStr)).map(Number));
+
+    const pull = new Set(digits((prevStr||"") + (prev2Str||"")).map(Number));
+
+    const score = (d) => {
+      let sc = 0;
+      sc += (s?.[d] ?? 0) * 10;
+      if(pull.has(d)) sc += 12;
+      if(ura[d] !== undefined) sc += 2;
+      if(me.some(x => x !== d && x + d === 9)) sc += 10;
+      if(me.some(x => x !== d && Math.abs(x - d) === 1)) sc += 6;
+      if(me.some(x => x !== d && Math.abs(x - d) === 2)) sc += 3;
+      sc += 1;
+      return sc;
+    };
+
+    const commons = me.filter(x => other.has(x));
+    if(commons.length >= 2){
+      return commons.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
+    }
+    if(commons.length === 1){
+      const rest = me.filter(x => x !== commons[0]).sort((a,b)=>score(b)-score(a));
+      const second = (rest[0] ?? commons[0]);
+      return [String(commons[0]), String(second)];
+    }
+
+    if(me.length >= 2){
+      return me.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
+    }
+    if(me.length === 1){
+      const candidates = [...Array(10)].map((_,i)=>i).filter(x=>x!==me[0]);
+      candidates.sort((a,b)=>score(b)-score(a));
+      return [String(me[0]), String(candidates[0] ?? me[0])];
+    }
+    return ["4","8"];
+  }
+
+  function chooseAxisFromRaw(h1raw, h2raw, s){
+    const a = uniq(digits(h1raw)).map(Number);
+    const b = uniq(digits(h2raw)).map(Number);
+    const setB = new Set(b);
+    const score = (d) => (s?.[d] ?? 0);
+
+    const commons = a.filter(x => setB.has(x));
+    if(commons.length >= 2){
+      commons.sort((x,y)=>score(y)-score(x));
+      return [String(commons[0]), String(commons[1])];
+    }
+    if(commons.length === 1){
+      const all = uniq([...a, ...b].filter(x => x !== commons[0]));
+      all.sort((x,y)=>score(y)-score(x));
+      const second = all[0] ?? commons[0];
+      return [String(commons[0]), String(second)];
+    }
+
+    const all = uniq([...a, ...b]);
+    all.sort((x,y)=>score(y)-score(x));
+    if(all.length >= 2) return [String(all[0]), String(all[1])];
+    return ["4","8"];
+  }
+
+  // =========================
+  // 6) プール（重み付け）
+  // =========================
+  function buildPoolWeighted(h1_2, h2_2, s){
+    let p = [];
+    p.push(...h1_2, ...h2_2);
+
+    for(const x of [...h1_2, ...h2_2]){
+      const n = +x;
+      if(ura[n] !== undefined) p.push(String(ura[n]));
+    }
+
+    for(const x of [...h1_2, ...h2_2]){
+      const n = +x;
+      zure1(n).forEach(z => p.push(String(z)));
+      zure2(n).forEach(z => p.push(String(z)));
+    }
+
+    for(let d=0; d<=9; d++){
+      const w = Math.min(10, Math.floor((s[d] ?? 0)));
+      for(let i=0;i<w;i++) p.push(String(d));
+    }
+
+    p.push("0","1","2","3","4","5","6","7","8","9");
+    return p;
+  }
+
+  // =========================
+  // 7) ランキング（足す9/連番＋ナンちゃん加点）
+  // =========================
+  function scoreNumberNanChan(n){
+    const a = n.split("").map(Number);
+    let sc = 0;
+
+    for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
+      if(a[i]+a[j]===9) sc += 3;
+      if(Math.abs(a[i]-a[j])===1) sc += 2;
+      if(Math.abs(a[i]-a[j])===2) sc += 1;
+    }
+
+    for(let i=0;i<4;i++){
+      const u = ura[a[i]];
+      if(u !== undefined && a.includes(u)) sc += 1;
+    }
+
+    const cnt = Array(10).fill(0);
+    a.forEach(x=>cnt[x]++);
+    const maxc = Math.max(...cnt);
+    const pairs = cnt.filter(x=>x===2).length;
+
+    if(maxc >= 2) sc += 2;
+    if(pairs === 2) sc += 4;
+    if(maxc === 3) sc += 6;
+    if(maxc === 4) sc += 10;
+
+    return sc;
+  }
+
+  function rank(nums){
+    return nums.map(n=>{
+      let sc = 0;
+      sc += scoreNumberNanChan(n);
+      return { n, sc };
+    }).sort((A,B)=>B.sc - A.sc);
+  }
+
+  function tierLabel(score, best){
+    if(best <= 0) return { badge:"★", label:"弱" };
+    const r = score / best;
+    if(r >= 0.92) return { badge:"★★★", label:"強" };
+    if(r >= 0.86) return { badge:"★★",  label:"中" };
+    return { badge:"★",   label:"弱" };
+  }
+
+  function formatRows(rows){
+    if(!rows || rows.length === 0) return "（なし）";
+    return rows.map(x => `${x.i}位  ${x.badge} [${x.label}]  ${x.num}`).join("\n");
+  }
+
+  function splitRanked(ranked, limit=10){
+    if(!ranked || ranked.length === 0) return { main: [], ins: [], rows: [] };
+    const best = ranked[0].sc;
+
+    const rows = ranked.slice(0, limit).map((r, idx) => {
+      const t = tierLabel(r.sc, best);
+      return { i: idx+1, num: r.n, badge: t.badge, label: t.label, sc: r.sc };
     });
-  });
 
-  render(score);
-}
+    return {
+      rows,
+      main: rows.filter(x => x.label === "強"),
+      ins : rows.filter(x => x.label !== "強")
+    };
+  }
 
-function render(score){
-  const names = ["千","百","十","一"];
-  const el = document.getElementById("table");
-  el.innerHTML = "";
+  function judgeDayPower(mainCount){
+    if(mainCount >= 5) return "🔥 今日は強い日（集中勝負）";
+    if(mainCount >= 3) return "◎ 普通の日（バランス）";
+    return "△ 分散の日（無理しない）";
+  }
 
-  score.forEach((arr,i)=>{
-    const top = arr
-      .map((s,n)=>({n,s}))
-      .sort((a,b)=>b.s-a.s)
-      .slice(0,4);
+  // =========================
+  // 8) ストレート予想表（千百十一）
+  // =========================
+  function renderPosCandidates(){
+    const posScores = buildPositionScores();
 
-    const box = document.createElement("div");
-    box.className="cell";
-    box.innerHTML = `<h3>${names[i]}の位</h3>` +
-      top.map(x=>`<div class="num">${x.n}</div><div class="score">+${x.s}</div>`).join("");
-    el.appendChild(box);
-  });
-}
+    const ids = ["pos1000","pos100","pos10","pos1"];
+    for(let pos=0; pos<4; pos++){
+      const arr = posScores[pos];
+      const cand = [...Array(10)].map((_,d)=>({d, sc: arr[d]}))
+        .sort((A,B)=>B.sc - A.sc)
+        .slice(0,4);
+
+      const root = document.getElementById(ids[pos]);
+      root.innerHTML = cand.map((x)=>{
+        return `
+          <div class="candRow">
+            <div class="candNum">${x.d}</div>
+            <div class="candScore">+${x.sc}</div>
+          </div>
+        `;
+      }).join("");
+    }
+  }
+
+  // =========================
+  // 9) 判定ヘルパー
+  // =========================
+  function posMatch(a,b){
+    let c=0;
+    for(let i=0;i<4;i++) if(a[i]===b[i]) c++;
+    return c;
+  }
+  function digitMatchCount(a,b){
+    const ca = Array(10).fill(0);
+    const cb = Array(10).fill(0);
+    for(const ch of a) ca[+ch]++;
+    for(const ch of b) cb[+ch]++;
+    let sum=0;
+    for(let i=0;i<10;i++) sum += Math.min(ca[i], cb[i]);
+    return sum;
+  }
+  function inGroup(num, groupRows){
+    return groupRows.find(r => r.num === num) || null;
+  }
+  function setKey(num){
+    return num.split("").sort().join("");
+  }
+
+  // =========================
+  // 10) 生成まとめ
+  // =========================
+  function generateAll(){
+    const hist = loadHistory();
+    if(hist.length < 10){
+      document.getElementById("judgeOut").innerHTML =
+        `<span class="warn">保存が少ない</span>：内臓データが ${hist.length} 件。できればまず 30〜100 件を保存してからの方が精度が上がるよ。`;
+    }
+    renderPosCandidates();
+    generateRanking();
+  }
+
+  function generateRanking(){
+    const sHist = scoreDigitsFromHistory();
+
+    const prevStr  = document.getElementById("prev").value;
+    const prev2Str = document.getElementById("prev2").value;
+
+    const s = [...sHist];
+    digits(prevStr).forEach(x => s[+x] += 2);
+    digits(prev2Str).forEach(x => s[+x] += 1);
+
+    const h1raw = document.getElementById("hint1").value;
+    const h2raw = document.getElementById("hint2").value;
+
+    const h1_2 = pick2FromHint(h1raw, s, prevStr, prev2Str, h2raw);
+    const h2_2 = pick2FromHint(h2raw, s, prevStr, prev2Str, h1raw);
+
+    const axisArr = chooseAxisFromRaw(h1raw, h2raw, s);
+    STATE.axis = axisArr[0] + axisArr[1];
+
+    const pool = buildPoolWeighted(h1_2, h2_2, s);
+
+    const historySeed = loadHistory().join(",");
+    const seedStr =
+      h1raw + "|" + h2raw + "|" +
+      prevStr + "|" + prev2Str + "|" +
+      historySeed;
+
+    const rand = mulberry32(hash32(seedStr));
+
+    let list = [];
+    while(list.length < 100){
+      let n = [axisArr[0], axisArr[1]];
+      while(n.length < 4) n.push(pick(pool, rand));
+      list.push(n.join(""));
+    }
+
+    const ranked = rank(uniq(list));
+    const top10 = ranked.slice(0, 10);
+    const sp = splitRanked(top10, 10);
+
+    document.getElementById("dayPower").textContent = judgeDayPower(sp.main.length);
+    document.getElementById("straightMain").textContent = formatRows(sp.main);
+    document.getElementById("straightIns").textContent  = formatRows(sp.ins);
+
+    const setNums = uniq(top10.map(r => setKey(r.n)));
+    const setRanked = rank(setNums).slice(0,10);
+    const setSplit = splitRanked(setRanked, 10);
+
+    document.getElementById("setMain").textContent = formatRows(setSplit.main);
+    document.getElementById("setIns").textContent  = formatRows(setSplit.ins);
+
+    STATE.topStraightRows = sp.rows;
+    STATE.straightMain = sp.main;
+    STATE.straightIns = sp.ins;
+
+    STATE.topSetRows = setSplit.rows;
+    STATE.setMain = setSplit.main;
+    STATE.setIns = setSplit.ins;
+
+    const out = document.getElementById("judgeOut");
+    out.innerHTML =
+      `<span class="ok">生成OK</span>（軸 <span class="mono">${STATE.axis}</span>）  結果が出たら当選番号を入れて「判定」してね。`;
+  }
+
+  // =========================
+  // 11) 結果判定（ストレート＋セット）
+  // =========================
+  function judge(){
+    const win = normalize4(document.getElementById("win").value);
+    const out = document.getElementById("judgeOut");
+
+    if(!win){
+      out.innerHTML = `<span class="warn">当選番号は4桁で入れてね</span>`;
+      return;
+    }
+
+    if(!STATE.topStraightRows || STATE.topStraightRows.length === 0){
+      out.innerHTML = `<span class="warn">先に「予想を生成する」を押してね</span>`;
+      return;
+    }
+
+    const axis = STATE.axis;
+    const axisHit = (win.includes(axis[0]) && win.includes(axis[1]));
+
+    const sMainHit = inGroup(win, STATE.straightMain);
+    const sInsHit  = inGroup(win, STATE.straightIns);
+    const sAnyHit  = inGroup(win, STATE.topStraightRows);
+
+    const winKey = setKey(win);
+    const setMainHit = inGroup(winKey, STATE.setMain);
+    const setInsHit  = inGroup(winKey, STATE.setIns);
+    const setAnyHit  = inGroup(winKey, STATE.topSetRows);
+
+    let bestPos = 0;
+    let bestDigit = 0;
+    for(const r of STATE.topStraightRows){
+      bestPos = Math.max(bestPos, posMatch(win, r.num));
+      bestDigit = Math.max(bestDigit, digitMatchCount(win, r.num));
+    }
+
+    let headline = "";
+    let detail = [];
+
+    if(sMainHit || setMainHit){
+      headline = "🔥 激アツ（読みが射程圏）";
+    } else if(sInsHit || setInsHit){
+      headline = "◎ 惜しい（流れは合ってる）";
+    } else if(sAnyHit || setAnyHit || bestPos >= 3){
+      headline = "○ 流れOK（あと一歩）";
+    } else if(bestDigit >= 2 || axisHit){
+      headline = "△ 分散の日（無理しない）";
+    } else {
+      headline = "× ズレ（今日は流れ違い）";
+    }
+
+    detail.push(`当選：<span class="mono">${win}</span>`);
+    detail.push(`軸：<span class="mono">${axis}</span>　/　軸一致：<span class="${axisHit?'ok':'warn'}">${axisHit?'○':'×'}</span>`);
+
+    if(sMainHit){
+      detail.push(`ストレート：<span class="ok">本命（強）</span>　${sMainHit.i}位`);
+    } else if(sInsHit){
+      detail.push(`ストレート：<span class="ok">保険（中・弱）</span>　${sInsHit.i}位`);
+    } else if(sAnyHit){
+      detail.push(`ストレート：<span class="ok">圏内</span>　${sAnyHit.i}位`);
+    } else {
+      detail.push(`ストレート：圏外（近さ：位置一致max ${bestPos}/4、数字一致max ${bestDigit}/4）`);
+    }
+
+    if(setMainHit){
+      detail.push(`セット：<span class="ok">本命（強）</span>　${setMainHit.i}位（キー ${winKey}）`);
+    } else if(setInsHit){
+      detail.push(`セット：<span class="ok">保険（中・弱）</span>　${setInsHit.i}位（キー ${winKey}）`);
+    } else if(setAnyHit){
+      detail.push(`セット：<span class="ok">圏内</span>　${setAnyHit.i}位（キー ${winKey}）`);
+    } else {
+      detail.push(`セット：圏外（キー ${winKey}）`);
+    }
+
+    out.innerHTML =
+      `<div class="big">${headline}</div>` +
+      `<div style="margin-top:8px;line-height:1.7">${detail.map(x=>`・${x}`).join("<br>")}</div>`;
+  }
+
+  // =========================
+  // 起動
+  // =========================
+  updateStorageHint();
+  renderPosCandidates();
 </script>
 
 </body>
