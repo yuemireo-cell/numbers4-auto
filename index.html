@@ -1,166 +1,2235 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>NUMBERS4 ANALYZER v1.0</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-body{
-  background:#0b1020;
-  color:#e5e7eb;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont;
-  margin:0;
-  padding:16px;
-}
-h1{font-size:20px;margin-bottom:12px}
-button{
-  background:#2563eb;
-  color:white;
-  border:none;
-  padding:10px 14px;
-  border-radius:8px;
-  font-size:14px;
-}
-.card{
-  background:#111827;
-  border-radius:12px;
-  padding:12px;
-  margin-bottom:12px;
-}
-.grid{
-  display:grid;
-  grid-template-columns: repeat(4,1fr);
-  gap:8px;
-}
-.cell{
-  background:#020617;
-  border-radius:8px;
-  padding:8px;
-}
-.rank{
-  display:flex;
-  justify-content:space-between;
-  font-size:14px;
-}
-small{color:#9ca3af}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ナンバーズ4 完成版（300回内蔵・解析強化）</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:16px;max-width:860px;margin:auto}
+    h1{font-size:34px;margin:10px 0 18px}
+    input,button{font-size:16px;padding:12px;width:100%;box-sizing:border-box;margin:8px 0;border-radius:14px;border:1px solid #e5e5e5}
+    button{background:#111;color:#fff;border:none;border-radius:999px;padding:16px;font-weight:900}
+    .btnRow{display:flex;gap:10px;flex-wrap:wrap}
+    .btnRow button{width:auto;flex:1;min-width:200px}
+    .box{background:#fafafa;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px}
+    .label{font-weight:900;margin-top:6px}
+    pre{white-space:pre-wrap;background:#f7f7f7;border-radius:14px;padding:12px;border:1px solid #eee}
+    .day{font-weight:900;margin:8px 0 0}
+    .note{color:#666;font-size:12px;margin-top:6px;line-height:1.5}
+    h2{margin-top:22px}
+    h3{margin:12px 0 6px}
+    .resultBox{background:#fff;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px}
+    .big{font-size:18px;font-weight:900}
+    .ok{color:#0a7;font-weight:900}
+    .warn{color:#b00020;font-weight:900}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+
+    /* 位別パネル */
+    .posGrid{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    .posCard{
+      border:3px solid #111;
+      border-radius:18px;
+      padding:12px;
+      background:#fff;
+      flex:1;
+      min-width:170px;
+    }
+    .posTitle{
+      font-weight:1000;
+      font-size:18px;
+      margin-bottom:8px;
+    }
+    .posRow{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      padding:10px 0;
+      border-bottom:1px solid #eee;
+    }
+    .posRow:last-child{border-bottom:none}
+    .posNum{
+      font-size:42px;
+      font-weight:1000;
+      line-height:1;
+    }
+    .posScore{
+      color:#666;
+      font-weight:900;
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      background:#111;
+      color:#fff;
+      padding:10px 14px;
+      border-radius:999px;
+      font-weight:900;
+      font-size:13px;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .18s ease;
+      z-index:9999;
+      max-width:92vw;
+      text-align:center;
+    }
+    .toast.show{opacity:0.95}
+  </style>
 </head>
-
 <body>
-<h1>NUMBERS4 ストレート解析</h1>
 
-<div class="card">
-  <button onclick="analyze()">解析する</button>
-  <button onclick="saveResult()">保存</button>
-</div>
+  <h1>ナンバーズ4 完成版（300回内蔵・解析強化）</h1>
 
-<div id="result"></div>
+  <!-- 保存＆生成 -->
+  <div class="box">
+    <div class="label">ヒント1（例：168 / 1・6・8）</div>
+    <input id="hint1" inputmode="numeric" placeholder="ヒント1 例：168">
+
+    <div class="label">ヒント2（例：3920 / 3・9・2・0）</div>
+    <input id="hint2" inputmode="numeric" placeholder="ヒント2 例：3920">
+
+    <div class="label">前回（自動）</div>
+    <input id="prev" inputmode="numeric" placeholder="前回 例：5105" maxlength="4">
+
+    <div class="label">前々回（自動）</div>
+    <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4">
+
+    <div class="label">今回の抽選結果（保存用・4桁）</div>
+    <input id="saveWin" inputmode="numeric" placeholder="例：9827" maxlength="4">
+
+    <div class="note">
+      ✅ 「直近10回」入力欄は廃止（内部300回＋保存履歴だけで解析）<br>
+      ✅ <strong>保存ボタン</strong>で「今回→前回」「前回→前々回」を自動更新（入力の手間ゼロ）<br>
+      ✅ 初回起動時は、<strong>第6909回〜第6609回のデータを内蔵</strong>（表には一切出さない）<br>
+      ✅ 保存データは端末内（localStorage）に最大<strong>300回</strong>保持（見えない）<br>
+      ※18時ギリギリのリハーサル数字は入れない（ゆうちゃん方針）
+    </div>
+
+    <div class="btnRow">
+      <button type="button" onclick="saveDraw()">📩 抽選結果を保存</button>
+      <button type="button" onclick="generate()">🔮 解析して番号を生成</button>
+    </div>
+  </div>
+
+  <!-- 位別ストレート解析 -->
+  <div class="resultBox">
+    <div class="label">ストレート予想（位別4候補 / 内部300回＋遷移＋出現間隔＋ナンちゃん加点）</div>
+    <div class="note">
+      ・千/百/十/一で「別のスコア」を作る（全位同じ並びにはしない）<br>
+      ・内蔵300回＋保存履歴から、<strong>位別頻度・直近重み・出現間隔・遷移（次に来やすい）</strong>を合成<br>
+      ・<strong>ナンちゃん法則</strong>は評価加点として常時ON（裏/±1/±2/足す9/連番/風車）<br>
+      ・前回/前々回は「引っ張り」として、遷移と位別に加点
+    </div>
+    <div id="posOut" class="posGrid"></div>
+  </div>
+
+  <!-- 判定 -->
+  <div class="resultBox">
+    <div class="label">当選番号（結果が出たらここに4桁）</div>
+    <input id="win" inputmode="numeric" placeholder="例：7263" maxlength="4">
+    <button type="button" onclick="judge()">結果を判定する</button>
+
+    <div id="judgeOut" class="mono" style="margin-top:10px;"></div>
+    <div class="note">※判定は「ストレート＋セット」両方を見る（ゆうちゃん指定）</div>
+  </div>
+
+  <h2>ストレート（ランキング）</h2>
+  <div id="dayPower" class="day"></div>
+
+  <h3>本命（強）</h3>
+  <pre id="straightMain">（ここに出ます）</pre>
+
+  <h3>保険（中・弱）</h3>
+  <pre id="straightIns">（ここに出ます）</pre>
+
+  <h2>セット（ランキング）</h2>
+
+  <h3>本命（強）</h3>
+  <pre id="setMain">（ここに出ます）</pre>
+
+  <h3>保険（中・弱）</h3>
+  <pre id="setIns">（ここに出ます）</pre>
+
+  <div id="toast" class="toast"></div>
 
 <script>
-/* ===============================
-   🔒 過去300回分（解析専用）
-   ※ 表示・UI利用一切なし
-   =============================== */
+/***************************************************************
+ * ✅ 固定仕様（ゆうちゃん）
+ * - チェック項目なし（全部常時ON）
+ * - 56本展開なし（ボタンも機能も無し）
+ * - 直近10回入力欄なし（内部300回＋保存で解析）
+ * - 保存ボタンで prev/prev2 自動更新
+ * - ストレート＆セット：ランキング（強/中/弱 + ★）
+ * - 判定：ストレート＋セット両方
+ * - 解析：裏数字/足す9/連番(±1,±2)/引っ張り/ダブル系/風車/出現間隔/遷移/平野式（簡易）
+ ***************************************************************/
 
-// ※ここに「すでにテキスト化した300回分」を
-// そのまま貼り付けている前提
-// 形式: [{round:6609, num:"9827"}, ... ]
+  // ===== 裏数字（ゆうちゃん定義）=====
+  const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
 
-const HISTORY_300 = JSON.parse(localStorage.getItem("HISTORY_300")) || [];
+  // ===== ナンちゃん補助（±1, ±2）=====
+  const plus1 = (n)=>[(n+1)%10,(n+9)%10];
+  const plus2 = (n)=>[(n+2)%10,(n+8)%10];
 
-/* ===============================
-   ユーティリティ
-   =============================== */
-const digits = n => n.split("").map(v=>+v);
-const rev = n => n.map(d => (9-d));
+  // ===== localStorage keys =====
+  const LS_KEY = "n4_history_300_v3"; // max 300, newest first, objects or strings
 
-/* ===============================
-   解析ロジック
-   =============================== */
-function analyze(){
-  if(HISTORY_300.length < 100){
-    alert("解析用データ不足");
-    return;
+  // ===== 状態保持（判定で使う）=====
+  const STATE = {
+    axis: "48",
+    topStraightRows: [],
+    topSetRows: [],
+    straightMain: [],
+    straightIns: [],
+    setMain: [],
+    setIns: [],
+    posScore: { k:Array(10).fill(0), h:Array(10).fill(0), t:Array(10).fill(0), o:Array(10).fill(0) }
+  };
+
+  // ===== 内蔵300回（表に出さない）=====
+  // ※曜日・金額は無視（抽出時に4桁だけ拾う）
+  const BUILTIN_RAW = `
+第6909回
+9827
+第6908回
+6120
+第6907回
+4588
+第6906回
+火曜日
+7964
+764,500円
+第6905回
+月曜日
+0176
+758,400円
+第6904回
+金曜日
+0515
+383,000円
+第6903回
+木曜日
+6022
+356,500円
+第6902回
+水曜日
+0615
+502,100円
+第6901回
+火曜日
+9534
+388,500円
+第6900回
+月曜日
+8174
+1,248,200円
+第6899回
+金曜日
+6436
+1,194,200円
+第6898回
+木曜日
+8060
+1,571,800円
+第6897回
+水曜日
+2404
+1,289,000円
+第6896回
+火曜日
+2699
+1,040,700円
+第6895回
+月曜日
+2827
+870,900円
+第6894回
+金曜日
+6551
+321,800円
+第6893回
+木曜日
+1632
+693,500円
+第6892回
+水曜日
+7263
+280,800円
+第6891回
+火曜日
+2300
+917,700円
+第6890回
+月曜日
+7526
+1,042,200円
+第6889回
+火曜日
+7202
+442,000円
+第6888回
+月曜日
+2121
+182,000円
+第6887回
+金曜日
+4141
+921,300円
+第6886回
+木曜日
+6333
+434,000円
+第6885回
+水曜日
+3984
+795,000円
+第6884回
+火曜日
+3278
+781,000円
+第6883回
+月曜日
+9785
+857,400円
+第6882回
+金曜日
+4944
+796,700円
+第6881回
+木曜日
+5879
+299,300円
+第6880回
+水曜日
+0497
+470,400円
+第6879回
+火曜日
+2310
+691,400円
+第6878回
+月曜日
+7221
+749,100円
+第6877回
+金曜日
+2528
+706,200円
+第6876回
+木曜日
+2208
+1,040,900円
+第6875回
+水曜日
+5272
+494,500円
+第6874回
+火曜日
+3123
+918,000円
+第6873回
+月曜日
+3493
+298,300円
+第6872回
+金曜日
+4784
+820,100円
+第6871回
+木曜日
+5571
+1,112,300円
+第6870回
+水曜日
+7263
+763,400円
+第6869回
+火曜日
+6936
+839,700円
+第6868回
+月曜日
+5396
+940,800円
+第6867回
+金曜日
+3076
+1,163,800円
+第6866回
+木曜日
+2803
+854,200円
+第6865回
+水曜日
+3324
+992,500円
+第6864回
+火曜日
+5445
+965,000円
+第6863回
+月曜日
+1258
+626,000円
+第6862回
+金曜日
+9741
+968,500円
+第6861回
+木曜日
+4693
+879,700円
+第6860回
+水曜日
+5186
+694,000円
+第6859回
+火曜日
+6444
+1,646,800円
+第6858回
+月曜日
+1184
+969,400円
+第6857回
+金曜日
+3116
+886,500円
+第6856回
+木曜日
+9991
+411,600円
+第6855回
+水曜日
+2123
+670,800円
+第6854回
+火曜日
+3403
+1,433,400円
+第6853回
+月曜日
+6727
+1,235,200円
+第6852回
+金曜日
+3049
+926,900円
+第6851回
+木曜日
+2981
+422,800円
+第6850回
+水曜日
+5282
+1,091,000円
+第6849回
+火曜日
+9227
+1,303,300円
+第6848回
+月曜日
+9275
+943,500円
+第6847回
+金曜日
+0137
+594,100円
+第6846回
+木曜日
+8726
+927,400円
+第6845回
+水曜日
+4714
+388,700円
+第6844回
+火曜日
+0017
+543,100円
+第6843回
+月曜日
+0523
+455,300円
+第6842回
+金曜日
+4591
+762,200円
+第6841回
+木曜日
+8612
+858,900円
+第6840回
+水曜日
+2326
+930,500円
+第6839回
+火曜日
+8607
+766,400円
+第6838回
+月曜日
+0100
+736,200円
+第6837回
+金曜日
+5441
+1,135,700円
+第6836回
+木曜日
+4325
+1,081,700円
+第6835回
+水曜日
+1350
+760,000円
+第6834回
+火曜日
+4706
+257,200円
+第6833回
+月曜日
+6896
+1,191,900円
+第6832回
+金曜日
+3148
+834,100円
+第6831回
+木曜日
+6352
+719,500円
+第6830回
+水曜日
+0220
+560,100円
+第6829回
+火曜日
+7717
+1,025,500円
+第6828回
+月曜日
+0933
+1,154,500円
+第6827回
+金曜日
+2964
+938,300円
+第6826回
+木曜日
+1916
+652,700円
+第6825回
+水曜日
+5280
+317,700円
+第6824回
+火曜日
+7765
+1,170,900円
+第6823回
+月曜日
+0012
+1,051,800円
+第6822回
+金曜日
+1540
+511,200円
+第6821回
+木曜日
+7728
+930,500円
+第6820回
+水曜日
+2477
+727,300円
+第6819回
+火曜日
+4787
+1,117,600円
+第6818回
+月曜日
+5808
+1,371,100円
+第6817回
+金曜日
+8721
+494,500円
+第6816回
+木曜日
+6152
+853,700円
+第6815回
+水曜日
+7604
+1,393,200円
+第6814回
+火曜日
+1314
+686,700円
+第6813回
+月曜日
+6867
+1,364,800円
+第6812回
+金曜日
+8991
+813,500円
+第6811回
+木曜日
+7961
+587,400円
+第6810回
+水曜日
+2679
+900,600円
+第6809回
+火曜日
+5260
+762,700円
+第6808回
+月曜日
+2841
+847,700円
+第6807回
+金曜日
+1871
+1,050,100円
+第6806回
+木曜日
+3376
+366,600円
+第6805回
+水曜日
+4598
+868,700円
+第6804回
+火曜日
+0538
+782,500円
+第6803回
+月曜日
+0549
+1,246,400円
+第6802回
+金曜日
+1929
+854,300円
+第6801回
+木曜日
+0774
+425,500円
+第6800回
+水曜日
+6694
+1,004,600円
+第6799回
+火曜日
+1624
+756,300円
+第6798回
+月曜日
+9463
+1,166,900円
+第6797回
+金曜日
+9660
+1,117,400円
+第6796回
+木曜日
+5806
+1,105,500円
+第6795回
+水曜日
+8749
+1,119,300円
+第6794回
+火曜日
+9288
+675,800円
+第6793回
+月曜日
+9959
+1,257,300円
+第6792回
+金曜日
+5140
+989,600円
+第6791回
+木曜日
+6362
+1,147,800円
+第6790回
+水曜日
+5541
+1,152,400円
+第6789回
+火曜日
+2458
+652,900円
+第6788回
+月曜日
+6014
+908,200円
+第6787回
+金曜日
+1365
+894,200円
+第6786回
+木曜日
+5835
+991,200円
+第6785回
+水曜日
+4876
+624,600円
+第6784回
+火曜日
+1027
+314,200円
+第6783回
+月曜日
+3080
+1,018,900円
+第6782回
+金曜日
+3497
+1,034,500円
+第6781回
+木曜日
+0536
+1,117,100円
+第6780回
+水曜日
+3175
+711,900円
+第6779回
+火曜日
+1592
+881,400円
+第6778回
+月曜日
+6710
+1,217,500円
+第6777回
+金曜日
+5454
+1,284,900円
+第6776回
+木曜日
+7924
+785,700円
+第6775回
+水曜日
+5493
+1,274,100円
+第6774回
+火曜日
+8714
+518,700円
+第6773回
+月曜日
+7780
+1,235,500円
+第6772回
+金曜日
+2460
+818,400円
+第6771回
+木曜日
+2337
+348,900円
+第6770回
+水曜日
+2037
+1,114,500円
+第6769回
+火曜日
+5552
+776,900円
+第6768回
+月曜日
+5295
+1,068,100円
+第6767回
+金曜日
+0172
+580,600円
+第6766回
+木曜日
+4790
+858,200円
+第6765回
+水曜日
+5358
+789,600円
+第6764回
+火曜日
+2982
+804,800円
+第6763回
+月曜日
+9181
+866,900円
+第6762回
+金曜日
+2452
+1,060,400円
+第6761回
+木曜日
+1479
+682,700円
+第6760回
+水曜日
+3099
+974,100円
+第6759回
+火曜日
+5261
+1,013,100円
+第6758回
+月曜日
+6757
+1,367,400円
+第6757回
+金曜日
+2940
+621,300円
+第6756回
+木曜日
+8622
+741,700円
+第6755回
+水曜日
+8174
+1,074,000円
+第6754回
+火曜日
+1351
+1,090,700円
+第6753回
+月曜日
+4804
+1,127,700円
+第6752回
+金曜日
+7102
+849,000円
+第6751回
+木曜日
+5354
+1,148,700円
+第6750回
+水曜日
+7592
+926,600円
+第6749回
+火曜日
+0975
+1,475,200円
+第6748回
+月曜日
+6326
+613,300円
+第6747回
+金曜日
+2482
+997,500円
+第6746回
+木曜日
+7666
+1,277,300円
+第6745回
+水曜日
+3176
+951,000円
+第6744回
+火曜日
+3142
+1,105,000円
+第6743回
+月曜日
+5084
+743,500円
+第6742回
+金曜日
+6563
+666,600円
+第6741回
+木曜日
+9318
+816,000円
+第6740回
+水曜日
+5944
+1,036,600円
+第6739回
+火曜日
+2370
+1,077,900円
+第6738回
+月曜日
+2839
+805,100円
+第6737回
+金曜日
+7141
+1,138,400円
+第6736回
+木曜日
+6779
+1,101,500円
+第6735回
+水曜日
+7357
+737,600円
+第6734回
+火曜日
+3697
+1,046,800円
+第6733回
+月曜日
+9115
+1,440,800円
+第6732回
+金曜日
+2718
+597,800円
+第6731回
+木曜日
+9899
+924,500円
+第6730回
+水曜日
+2762
+1,401,400円
+第6729回
+火曜日
+6418
+719,700円
+第6728回
+月曜日
+9601
+859,400円
+第6727回
+金曜日
+4116
+1,125,600円
+第6726回
+木曜日
+4368
+510,000円
+第6725回
+水曜日
+1898
+733,200円
+第6724回
+火曜日
+9565
+992,900円
+第6723回
+月曜日
+8892
+1,059,300円
+第6722回
+金曜日
+1883
+877,100円
+第6721回
+木曜日
+8156
+841,000円
+第6720回
+水曜日
+1952
+455,300円
+第6719回
+火曜日
+0081
+935,000円
+第6718回
+月曜日
+8391
+868,200円
+第6717回
+金曜日
+2948
+781,600円
+第6716回
+木曜日
+8968
+946,100円
+第6715回
+水曜日
+5323
+810,900円
+第6714回
+火曜日
+3449
+1,624,700円
+第6713回
+月曜日
+1670
+880,100円
+第6712回
+金曜日
+4071
+1,053,000円
+第6711回
+木曜日
+9686
+1,222,800円
+第6710回
+水曜日
+7059
+1,120,300円
+第6709回
+火曜日
+6697
+1,511,400円
+第6708回
+月曜日
+7834
+952,600円
+第6707回
+金曜日
+4811
+780,000円
+第6706回
+木曜日
+8842
+999,500円
+第6705回
+水曜日
+7555
+1,241,300円
+第6704回
+火曜日
+2166
+1,283,500円
+第6703回
+月曜日
+1820
+697,400円
+第6702回
+金曜日
+7011
+576,300円
+第6701回
+木曜日
+7856
+1,007,800円
+第6700回
+水曜日
+4013
+610,600円
+第6699回
+火曜日
+4417
+700,900円
+第6698回
+月曜日
+2078
+870,700円
+第6697回
+金曜日
+9721
+1,099,800円
+第6696回
+木曜日
+7892
+1,370,300円
+第6695回
+水曜日
+1695
+1,162,400円
+第6694回
+火曜日
+3671
+1,071,800円
+第6693回
+月曜日
+8221
+879,300円
+第6692回
+金曜日
+6185
+770,900円
+第6691回
+木曜日
+0745
+1,171,200円
+第6690回
+水曜日
+8397
+1,083,500円
+第6689回
+火曜日
+2191
+383,200円
+第6688回
+月曜日
+0488
+1,386,200円
+第6687回
+金曜日
+1431
+1,123,900円
+第6686回
+木曜日
+8555
+829,700円
+第6685回
+水曜日
+1087
+838,400円
+第6684回
+火曜日
+9843
+564,200円
+第6683回
+月曜日
+7006
+1,657,400円
+第6682回
+金曜日
+2853
+709,600円
+第6681回
+木曜日
+0384
+891,500円
+第6680回
+水曜日
+9200
+1,067,700円
+第6679回
+火曜日
+8261
+1,030,900円
+第6678回
+月曜日
+8256
+863,300円
+第6677回
+金曜日
+0948
+834,200円
+第6676回
+木曜日
+1781
+818,500円
+第6675回
+水曜日
+8194
+917,500円
+第6674回
+火曜日
+6318
+694,700円
+第6673回
+月曜日
+1170
+942,300円
+第6672回
+金曜日
+4968
+807,400円
+第6671回
+木曜日
+3839
+802,600円
+第6670回
+水曜日
+0664
+966,000円
+第6669回
+火曜日
+9378
+1,106,400円
+第6668回
+月曜日
+3026
+865,900円
+第6667回
+金曜日
+6398
+1,015,900円
+第6666回
+木曜日
+1890
+818,800円
+第6665回
+水曜日
+9265
+1,018,000円
+第6664回
+火曜日
+0385
+527,200円
+第6663回
+月曜日
+6744
+1,134,500円
+第6662回
+金曜日
+3273
+1,069,800円
+第6661回
+木曜日
+1946
+699,000円
+第6660回
+水曜日
+3343
+1,212,100円
+第6659回
+火曜日
+8942
+1,273,400円
+第6658回
+月曜日
+0859
+1,502,000円
+第6657回
+金曜日
+3881
+885,200円
+第6656回
+木曜日
+0853
+654,100円
+第6655回
+水曜日
+2317
+630,000円
+第6654回
+火曜日
+4827
+931,600円
+第6653回
+月曜日
+0235
+892,300円
+第6652回
+金曜日
+1596
+872,400円
+第6651回
+木曜日
+5400
+453,400円
+第6650回
+水曜日
+9590
+1,179,600円
+第6649回
+火曜日
+0893
+297,600円
+第6648回
+月曜日
+7240
+323,600円
+第6647回
+金曜日
+2315
+463,100円
+第6646回
+木曜日
+5420
+969,900円
+第6645回
+水曜日
+6385
+701,000円
+第6644回
+火曜日
+8259
+271,900円
+第6643回
+月曜日
+4409
+1,090,300円
+第6642回
+金曜日
+9774
+345,800円
+第6641回
+木曜日
+2324
+742,200円
+第6640回
+水曜日
+1366
+1,318,600円
+第6639回
+火曜日
+0135
+933,900円
+第6638回
+月曜日
+8583
+587,700円
+第6637回
+金曜日
+1599
+939,200円
+第6636回
+木曜日
+5802
+316,000円
+第6635回
+水曜日
+1786
+566,800円
+第6634回
+火曜日
+3754
+230,200円
+第6633回
+月曜日
+0685
+837,000円
+第6632回
+月曜日
+9983
+276,700円
+第6631回
+金曜日
+4386
+983,800円
+第6630回
+木曜日
+4119
+858,500円
+第6629回
+水曜日
+0474
+1,430,900円
+第6628回
+火曜日
+5231
+927,600円
+第6627回
+月曜日
+5892
+439,000円
+第6626回
+金曜日
+0580
+514,100円
+第6625回
+木曜日
+5214
+921,300円
+第6624回
+水曜日
+3498
+999,000円
+第6623回
+火曜日
+0596
+1,145,500円
+第6622回
+月曜日
+3424
+909,200円
+第6621回
+金曜日
+6199
+887,900円
+第6620回
+木曜日
+9105
+250,300円
+第6619回
+水曜日
+6217
+988,900円
+第6618回
+火曜日
+4259
+1,031,900円
+第6617回
+月曜日
+2617
+564,900円
+第6616回
+金曜日
+8939
+542,800円
+第6615回
+木曜日
+8253
+919,900円
+第6614回
+水曜日
+0000
+211,400円
+第6613回
+火曜日
+1978
+289,700円
+第6612回
+月曜日
+3920
+1,186,800円
+第6611回
+金曜日
+3212
+465,900円
+第6610回
+木曜日
+4640
+1,107,000円
+第6609回
+水曜日
+8963
+813,000円
+`;
+
+  // ===== utils =====
+  function digits(str){ return (str || "").match(/\d/g) || []; }
+  function normalize4(str){
+    const d = digits(str).slice(0,4);
+    if(d.length !== 4) return null;
+    return d.join("");
+  }
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    setTimeout(()=>el.classList.remove("show"), 1600);
+  }
+  function uniq(arr){
+    const s = new Set(), out=[];
+    for(const x of arr){ if(!s.has(x)){ s.add(x); out.push(x); } }
+    return out;
   }
 
-  const posFreq = Array.from({length:4},()=>Array(10).fill(0));
-  const lastSeen = Array.from({length:4},()=>Array(10).fill(null));
-  const transition = Array.from({length:4},()=>Array.from({length:10},()=>Array(10).fill(0)));
+  // 固定乱数（同入力でブレない）
+  function hash32(str){
+    let h = 2166136261;
+    for(let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function mulberry32(seed){
+    return function(){
+      let t = seed += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
 
-  HISTORY_300.forEach((h,i)=>{
-    const d = digits(h.num);
-    d.forEach((v,p)=>{
-      posFreq[p][v]++;
-      if(i>0){
-        const prev = digits(HISTORY_300[i-1].num)[p];
-        transition[p][prev][v]++;
+  // ===== 内蔵データ抽出（回号→4桁、曜日/金額は無視）=====
+  function parseBuiltin(raw){
+    const map = new Map(); // draw -> num
+    const re = /第(\d+)回([\s\S]*?)(?=第\d+回|$)/g;
+    let m;
+    while((m = re.exec(raw))){
+      const draw = Number(m[1]);
+      const block = m[2] || "";
+      // ブロック内の「最初の4桁」を当選数字として採用
+      const n = (block.match(/\b\d{4}\b/) || [])[0];
+      const num = normalize4(n || "");
+      if(num){
+        // 同じ回が重複してたら最初のやつ優先（今回の入力はそれでOK）
+        if(!map.has(draw)) map.set(draw, num);
       }
-      lastSeen[p][v]=i;
-    });
-  });
+    }
+    // 最新→古い
+    const draws = [...map.keys()].sort((a,b)=>b-a);
+    const out = draws.map(d => ({draw:d, num: map.get(d)}));
+    return out;
+  }
 
-  const recent10 = HISTORY_300.slice(0,10).map(h=>digits(h.num));
+  const BUILTIN = parseBuiltin(BUILTIN_RAW);
 
-  const score = Array.from({length:4},()=>Array(10).fill(0));
+  // ===== 履歴ロード/セーブ（300件、表に出さない）=====
+  function loadHistory(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      const arr = raw ? JSON.parse(raw) : null;
 
-  for(let p=0;p<4;p++){
-    for(let n=0;n<10;n++){
-      score[p][n]+=posFreq[p][n]*0.5;
+      // 初回：内蔵データをセット
+      if(!arr || !Array.isArray(arr) || arr.length === 0){
+        const seeded = BUILTIN.slice(0); // 最新→古い
+        // 重複を削って300件に丸める（回号重複の救済）
+        const seenDraw = new Set();
+        const seenNumSeq = [];
+        const cleaned = [];
+        for(const it of seeded){
+          if(seenDraw.has(it.draw)) continue;
+          seenDraw.add(it.draw);
+          cleaned.push({draw: it.draw, num: it.num});
+          if(cleaned.length >= 300) break;
+        }
+        localStorage.setItem(LS_KEY, JSON.stringify(cleaned));
+        return cleaned;
+      }
 
-      // 出現間隔
-      const gap = lastSeen[p][n];
-      if(gap!==null) score[p][n]+=Math.max(0,20-gap);
-
-      // 遷移
-      const prevDigit = recent10[0][p];
-      score[p][n]+=transition[p][prevDigit][n]*2;
-
-      // ナンちゃん法則
-      if(rev([n]).includes(prevDigit)) score[p][n]+=3;
-      if(Math.abs(n-prevDigit)<=2) score[p][n]+=2;
+      // 既存あり：旧形式(文字列配列)も救済
+      const normalized = [];
+      for(const it of arr){
+        if(typeof it === "string"){
+          const n = normalize4(it);
+          if(n) normalized.push({draw:null, num:n});
+        }else if(it && typeof it === "object"){
+          const n = normalize4(it.num || "");
+          if(n) normalized.push({draw: Number.isFinite(+it.draw) ? +it.draw : null, num:n});
+        }
+      }
+      return normalized.slice(0,300);
+    }catch(e){
+      // 壊れてたら内蔵で復旧
+      const cleaned = BUILTIN.slice(0,300).map(x=>({draw:x.draw,num:x.num}));
+      localStorage.setItem(LS_KEY, JSON.stringify(cleaned));
+      return cleaned;
     }
   }
 
-  render(score);
-}
+  function saveHistory(arr){
+    localStorage.setItem(LS_KEY, JSON.stringify(arr.slice(0,300)));
+  }
 
-function render(score){
-  const posName=["千","百","十","一"];
-  let html="";
-  score.forEach((arr,p)=>{
-    const ranked = arr
-      .map((v,i)=>({n:i,s:v}))
-      .sort((a,b)=>b.s-a.s)
-      .slice(0,4);
+  // prev/prev2 を履歴から反映
+  function syncPrevFieldsFromHistory(){
+    const hist = loadHistory();
+    document.getElementById("prev").value  = (hist[0]?.num || "");
+    document.getElementById("prev2").value = (hist[1]?.num || "");
+  }
 
-    html+=`
-      <div class="card">
-        <strong>${posName[p]}の位</strong>
-        ${ranked.map(r=>`
-          <div class="rank">
-            <span>${r.n}</span>
-            <small>+${r.s.toFixed(1)}</small>
+  // 保存：今回を先頭に入れて prev/prev2 自動更新
+  function saveDraw(){
+    const win = normalize4(document.getElementById("saveWin").value);
+    if(!win){ toast("4桁で入れてね"); return; }
+
+    let hist = loadHistory();
+
+    // 直近と同じは弾く
+    if(hist[0]?.num === win){
+      toast("同じ番号は連続保存しないよ");
+      return;
+    }
+
+    // 先頭に追加（draw番号は不明なのでnull）
+    hist.unshift({draw:null, num:win});
+
+    // 300超えは削る
+    hist = hist.slice(0,300);
+    saveHistory(hist);
+
+    // prev/prev2 更新
+    document.getElementById("prev").value  = hist[0]?.num || "";
+    document.getElementById("prev2").value = hist[1]?.num || "";
+
+    toast(`保存OK：最新 ${win}（履歴 ${hist.length}件）`);
+  }
+
+  // ===== 解析コア：重み（最新優先）=====
+  function recencyWeight(i){
+    // i=0が最新
+    if(i < 10) return 3.2;
+    if(i < 40) return 2.0;
+    if(i < 120) return 1.3;
+    return 1.0;
+  }
+
+  // ===== 平野式（簡易・常時ON）：数字候補(0-9) =====
+  function hiranoDigitCandidates(prev, prev2){
+    // 表/裏/合算(同位置)/合わせ(表+裏)
+    const out = new Set();
+    if(!prev) return out;
+
+    const A = prev.split("").map(x=>+x);
+    const B = prev2 ? prev2.split("").map(x=>+x) : null;
+
+    // 表
+    A.forEach(x=>out.add(x));
+    // 裏
+    A.forEach(x=>out.add(ura[x]));
+    // 合算（同位置）
+    if(B){
+      for(let i=0;i<4;i++) out.add((A[i]+B[i])%10);
+    }else{
+      out.add((A[0]+A[1]+A[2]+A[3])%10);
+    }
+    // 合わせ（表+裏）
+    for(const x of A) out.add((x + ura[x])%10);
+
+    return out;
+  }
+
+  // ===== 出現間隔（ギャップ）=====
+  function buildGaps(hist){
+    // 各位の「最後に出た index」を探してギャップ値にする
+    const lastIdx = {
+      k:Array(10).fill(Infinity),
+      h:Array(10).fill(Infinity),
+      t:Array(10).fill(Infinity),
+      o:Array(10).fill(Infinity)
+    };
+
+    for(let i=0;i<hist.length;i++){
+      const n = hist[i].num;
+      if(!n) continue;
+      const a = n.split("").map(Number);
+      if(lastIdx.k[a[0]] === Infinity) lastIdx.k[a[0]] = i;
+      if(lastIdx.h[a[1]] === Infinity) lastIdx.h[a[1]] = i;
+      if(lastIdx.t[a[2]] === Infinity) lastIdx.t[a[2]] = i;
+      if(lastIdx.o[a[3]] === Infinity) lastIdx.o[a[3]] = i;
+    }
+
+    // ギャップが大きいほど少し加点（出現間隔理論）
+    // ただし“出過ぎ”抑制のため上限あり
+    const gapScore = {k:Array(10).fill(0),h:Array(10).fill(0),t:Array(10).fill(0),o:Array(10).fill(0)};
+    for(const key of ["k","h","t","o"]){
+      for(let d=0; d<=9; d++){
+        const g = lastIdx[key][d];
+        if(!Number.isFinite(g)) { gapScore[key][d] = 0.6; continue; }
+        // 0..299 → 0..約1.6
+        gapScore[key][d] = Math.min(1.6, Math.log(1+g)/2.2);
+      }
+    }
+    return gapScore;
+  }
+
+  // ===== 遷移（次に来やすい）=====
+  function buildTransitions(hist){
+    // pos-wise Markov: trans[pos][from][to]
+    const initMat = ()=>Array.from({length:10},()=>Array(10).fill(0));
+    const trans = {k:initMat(), h:initMat(), t:initMat(), o:initMat()};
+    const keys = ["k","h","t","o"];
+
+    // hist[0]=最新, hist[1]=前回... なので
+    // 「ある回の次(未来)」は indexが小さい方向。
+    // ここでは「prev(=hist[i+1]) -> next(=hist[i])」として学習する。
+    for(let i=1;i<hist.length;i++){
+      const newer = hist[i-1]?.num;
+      const older = hist[i]?.num;
+      if(!newer || !older) continue;
+
+      // older -> newer の遷移
+      const o = older.split("").map(Number);
+      const n = newer.split("").map(Number);
+
+      // 学習重み：遷移は直近ほど強い
+      const w = recencyWeight(i-1);
+
+      for(let p=0;p<4;p++){
+        const from = o[p], to = n[p];
+        trans[keys[p]][from][to] += w;
+      }
+    }
+    return trans;
+  }
+
+  // ===== 基礎頻度（位別＆全体）=====
+  function buildFrequencies(hist){
+    const pos = { k:Array(10).fill(0), h:Array(10).fill(0), t:Array(10).fill(0), o:Array(10).fill(0) };
+    const all = Array(10).fill(0);
+
+    for(let i=0;i<hist.length;i++){
+      const n = hist[i].num;
+      if(!n) continue;
+
+      const w = recencyWeight(i);
+      const a = n.split("").map(Number);
+
+      pos.k[a[0]] += w; pos.h[a[1]] += w; pos.t[a[2]] += w; pos.o[a[3]] += w;
+      all[a[0]] += 1; all[a[1]] += 1; all[a[2]] += 1; all[a[3]] += 1;
+    }
+    return {pos, all};
+  }
+
+  // ===== ナンちゃん法則：加点（裏/±1/±2）を“位別”へ =====
+  function applyNanChanPosBonus(posScore){
+    const out = {k:posScore.k.slice(),h:posScore.h.slice(),t:posScore.t.slice(),o:posScore.o.slice()};
+    for(const key of ["k","h","t","o"]){
+      const s = posScore[key];
+      const idx = [...Array(10)].map((_,d)=>d).sort((a,b)=>s[b]-s[a]);
+
+      // 位別トップ2をアンカーにする（偏りすぎ防止）
+      const anchors = [idx[0], idx[1]].filter(x=>Number.isFinite(x));
+
+      for(let d=0; d<=9; d++){
+        let add = 0;
+        for(const a of anchors){
+          if(ura[a] === d) add += 2.0;           // 裏
+          if(plus1(a).includes(d)) add += 1.4;   // ±1
+          if(plus2(a).includes(d)) add += 0.9;   // ±2
+        }
+        out[key][d] += add;
+      }
+    }
+    return out;
+  }
+
+  // ===== 風車番（簡易）=====
+  // 「裏ペア(0-5,1-6,2-7,3-8,4-9)が2組そろってる」→風車っぽいとみなして加点
+  function windmillBonus(numStr){
+    const s = new Set(numStr.split("").map(Number));
+    const pairs = [[0,5],[1,6],[2,7],[3,8],[4,9]];
+    let cnt = 0;
+    for(const [a,b] of pairs){
+      if(s.has(a) && s.has(b)) cnt++;
+    }
+    if(cnt >= 2) return 1.3;
+    if(cnt === 1) return 0.4;
+    return 0;
+  }
+
+  // ===== 足す9 / 連番(±1/±2) =====
+  function sum9Bonus(digs){
+    let sc = 0;
+    for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
+      if(digs[i]+digs[j]===9) sc += 1.7;
+    }
+    return sc;
+  }
+  function consecutiveBonus(digs){
+    let sc = 0;
+    for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
+      const diff = Math.abs(digs[i]-digs[j]);
+      if(diff===1) sc += 1.1;
+      if(diff===2) sc += 0.7;
+    }
+    return sc;
+  }
+  function doubleTripleBonus(digs){
+    const c = Array(10).fill(0);
+    digs.forEach(x=>c[x]++);
+    const maxc = Math.max(...c);
+    let sc = 0;
+    if(maxc>=2) sc += 0.9;
+    if(maxc>=3) sc += 0.9;
+    if(maxc===4) sc += 1.1;
+    return sc;
+  }
+
+  // ===== 位別スコア（本丸）=====
+  function buildPositionScores(){
+    const hist = loadHistory();
+    const {pos, all} = buildFrequencies(hist);
+    const gap = buildGaps(hist);
+    const trans = buildTransitions(hist);
+
+    // ベース（位別頻度）
+    const base = {k:pos.k.slice(),h:pos.h.slice(),t:pos.t.slice(),o:pos.o.slice()};
+
+    // 全体頻度を保険で混ぜる（位別の主張を壊さない程度）
+    for(const key of ["k","h","t","o"]){
+      for(let d=0; d<=9; d++){
+        base[key][d] += all[d] * 0.10;
+      }
+    }
+
+    // 出現間隔（ギャップ）加点
+    for(const key of ["k","h","t","o"]){
+      for(let d=0; d<=9; d++){
+        base[key][d] += gap[key][d] * 1.4;
+      }
+    }
+
+    // 引っ張り（同一位）
+    const prev = normalize4(document.getElementById("prev").value);
+    const prev2 = normalize4(document.getElementById("prev2").value);
+    if(prev){
+      base.k[+prev[0]] += 2.6; base.h[+prev[1]] += 2.6; base.t[+prev[2]] += 2.6; base.o[+prev[3]] += 2.6;
+    }
+    if(prev2){
+      base.k[+prev2[0]] += 1.7; base.h[+prev2[1]] += 1.7; base.t[+prev2[2]] += 1.7; base.o[+prev2[3]] += 1.7;
+    }
+
+    // 遷移（次に来やすい）
+    // prev/prev2 の「次」に多い数字を加点
+    function addTransitionBonus(posKey, fromDigitChar, w){
+      if(!fromDigitChar) return;
+      const from = +fromDigitChar;
+      if(!Number.isFinite(from)) return;
+      const row = trans[posKey][from];
+      // 上位2に強めに寄せる
+      const idx = [...Array(10)].map((_,d)=>d).sort((a,b)=>row[b]-row[a]);
+      if(row[idx[0]]>0) base[posKey][idx[0]] += 1.8*w;
+      if(row[idx[1]]>0) base[posKey][idx[1]] += 1.1*w;
+    }
+    if(prev){
+      addTransitionBonus("k", prev[0], 1.0);
+      addTransitionBonus("h", prev[1], 1.0);
+      addTransitionBonus("t", prev[2], 1.0);
+      addTransitionBonus("o", prev[3], 1.0);
+    }
+    if(prev2){
+      addTransitionBonus("k", prev2[0], 0.7);
+      addTransitionBonus("h", prev2[1], 0.7);
+      addTransitionBonus("t", prev2[2], 0.7);
+      addTransitionBonus("o", prev2[3], 0.7);
+    }
+
+    // 平野式候補（数字プール加点）
+    const hset = hiranoDigitCandidates(prev, prev2);
+    for(const key of ["k","h","t","o"]){
+      for(const d of hset){
+        base[key][d] += 0.8;
+      }
+    }
+
+    // ナンちゃん（裏/±1/±2）強化
+    const withNan = applyNanChanPosBonus(base);
+
+    // 最低保障
+    for(const key of ["k","h","t","o"]) for(let d=0; d<=9; d++) withNan[key][d] += 0.25;
+
+    return withNan;
+  }
+
+  // 位別トップ4（表示用）
+  function top4FromScores(scoreArr){
+    const idx = [...Array(10)].map((_,d)=>d).sort((a,b)=>scoreArr[b]-scoreArr[a]);
+    return idx.slice(0,4).map(d => ({ d, sc: scoreArr[d] }));
+  }
+  function renderPosOut(posScore){
+    const map = [
+      {key:"k", title:"千の位"},
+      {key:"h", title:"百の位"},
+      {key:"t", title:"十の位"},
+      {key:"o", title:"一の位"}
+    ];
+    const out = document.getElementById("posOut");
+    out.innerHTML = "";
+    for(const m of map){
+      const top = top4FromScores(posScore[m.key]);
+      const card = document.createElement("div");
+      card.className = "posCard";
+      card.innerHTML = `
+        <div class="posTitle">${m.title}</div>
+        ${top.map(x => `
+          <div class="posRow">
+            <div class="posNum">${x.d}</div>
+            <div class="posScore">+${(Math.round(x.sc*10)/10).toFixed(1)}</div>
           </div>
         `).join("")}
-      </div>
-    `;
-  });
-  document.getElementById("result").innerHTML=html;
-}
+      `;
+      out.appendChild(card);
+    }
+  }
 
-/* ===============================
-   保存処理
-   =============================== */
-function saveResult(){
-  const input = prompt("今回の当選数字（4桁）");
-  if(!input || input.length!==4) return;
+  // ===== ヒントは「必ず2つだけ」（共通最優先）=====
+  function pick2FromHint(meStr, otherStr, posScore, prevStr, prev2Str){
+    const me = uniq(digits(meStr)).map(Number);
+    const other = new Set(uniq(digits(otherStr)).map(Number));
 
-  HISTORY_300.unshift({round:null,num:input});
-  if(HISTORY_300.length>300) HISTORY_300.pop();
+    // 引っ張り集合（数字全体としても少し効かせる）
+    const pull = new Set(digits((prevStr||"") + (prev2Str||"")).map(Number));
 
-  localStorage.setItem("HISTORY_300",JSON.stringify(HISTORY_300));
-  alert("保存完了（prev/prev2 自動更新）");
-}
+    const score = (d) => {
+      let sc = 0;
+      // 位別スコアの平均を使う（ヒントは位不明なので平均で）
+      sc += (posScore.k[d] + posScore.h[d] + posScore.t[d] + posScore.o[d]) * 0.35;
+      if(pull.has(d)) sc += 2.0;
+      // 足す9/連番（ヒント内の関係性）
+      if(me.some(x => x !== d && x + d === 9)) sc += 1.2;
+      if(me.some(x => x !== d && Math.abs(x - d) === 1)) sc += 0.7;
+      if(me.some(x => x !== d && Math.abs(x - d) === 2)) sc += 0.4;
+      // 裏数字
+      if(ura[d] !== undefined) sc += 0.2;
+      return sc;
+    };
+
+    const commons = me.filter(x => other.has(x));
+    if(commons.length >= 2){
+      return commons.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
+    }
+    if(commons.length === 1){
+      const rest = me.filter(x => x !== commons[0]).sort((a,b)=>score(b)-score(a));
+      const second = (rest[0] ?? commons[0]);
+      return [String(commons[0]), String(second)];
+    }
+
+    if(me.length >= 2){
+      return me.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
+    }
+    if(me.length === 1){
+      const candidates = [...Array(10)].map((_,i)=>i).filter(x=>x!==me[0]).sort((a,b)=>score(b)-score(a));
+      return [String(me[0]), String(candidates[0] ?? me[0])];
+    }
+    // 空の保険
+    return ["4","8"];
+  }
+
+  // ===== 軸2桁：間引く前の共通最優先（rawで見る）=====
+  function chooseAxisFromRaw(h1raw, h2raw, posScore){
+    const a = uniq(digits(h1raw)).map(Number);
+    const b = uniq(digits(h2raw)).map(Number);
+    const setB = new Set(b);
+
+    const avgScore = (d)=> (posScore.k[d]+posScore.h[d]+posScore.t[d]+posScore.o[d]) / 4;
+
+    const commons = a.filter(x => setB.has(x));
+    if(commons.length >= 2){
+      commons.sort((x,y)=>avgScore(y)-avgScore(x));
+      return [String(commons[0]), String(commons[1])];
+    }
+    if(commons.length === 1){
+      const all = uniq([...a, ...b].filter(x => x !== commons[0]));
+      all.sort((x,y)=>avgScore(y)-avgScore(x));
+      const second = all[0] ?? commons[0];
+      return [String(commons[0]), String(second)];
+    }
+
+    const all = uniq([...a, ...b]);
+    all.sort((x,y)=>avgScore(y)-avgScore(x));
+    if(all.length >= 2) return [String(all[0]), String(all[1])];
+
+    // ヒントが空でも回すための保険：位別トップから拾う
+    const kTop = [...Array(10)].map((_,d)=>d).sort((x,y)=>posScore.k[y]-posScore.k[x]);
+    return [String(kTop[0] ?? 4), String(kTop[1] ?? 8)];
+  }
+
+  // ===== 生成プール（重み付き）=====
+  function buildPoolWeighted(h1_2, h2_2, posScore){
+    let p = [];
+
+    // ヒント（必ず2+2）をベースに
+    p.push(...h1_2, ...h2_2);
+
+    // 裏
+    for(const x of [...h1_2, ...h2_2]){
+      const n = +x;
+      p.push(String(ura[n]));
+    }
+
+    // 連番±1±2
+    for(const x of [...h1_2, ...h2_2]){
+      const n = +x;
+      for(const d of plus1(n)) p.push(String(d));
+      for(const d of plus2(n)) p.push(String(d));
+    }
+
+    // 位別トップを微量混ぜる（偏りを作る）
+    const tops = [];
+    for(const key of ["k","h","t","o"]){
+      tops.push(...top4FromScores(posScore[key]).slice(0,2).map(x=>String(x.d)));
+    }
+    p.push(...tops);
+
+    // 平野式候補も少し混ぜる
+    const prev = normalize4(document.getElementById("prev").value);
+    const prev2 = normalize4(document.getElementById("prev2").value);
+    const hset = hiranoDigitCandidates(prev, prev2);
+    for(const d of hset) p.push(String(d));
+
+    // 最低限：0-9
+    p.push("0","1","2","3","4","5","6","7","8","9");
+
+    return p;
+  }
+
+  function pick(pool, rand){
+    return pool[Math.floor(rand() * pool.length)];
+  }
+
+  // ===== ランキング（候補4桁に点を付ける）=====
+  function rankStraight(nums, posScore){
+    return nums.map(n=>{
+      const a = n.split("").map(Number);
+      let sc = 0;
+
+      // 位別スコア（芯）
+      sc += posScore.k[a[0]] + posScore.h[a[1]] + posScore.t[a[2]] + posScore.o[a[3]];
+
+      // 足す9 / 連番（±1±2）
+      sc += sum9Bonus(a);
+      sc += consecutiveBonus(a);
+
+      // ダブル/トリプル
+      sc += doubleTripleBonus(a);
+
+      // 風車
+      sc += windmillBonus(n);
+
+      // “引っ張り”として、prev/prev2 の同一桁一致を追加で少し
+      const prev = normalize4(document.getElementById("prev").value);
+      const prev2 = normalize4(document.getElementById("prev2").value);
+      if(prev){
+        if(n[0]===prev[0]) sc += 0.8;
+        if(n[1]===prev[1]) sc += 0.8;
+        if(n[2]===prev[2]) sc += 0.8;
+        if(n[3]===prev[3]) sc += 0.8;
+      }
+      if(prev2){
+        if(n[0]===prev2[0]) sc += 0.5;
+        if(n[1]===prev2[1]) sc += 0.5;
+        if(n[2]===prev2[2]) sc += 0.5;
+        if(n[3]===prev2[3]) sc += 0.5;
+      }
+
+      return { n, sc };
+    }).sort((A,B)=>B.sc - A.sc);
+  }
+
+  // セットは「並びキー」で、足す9/連番/風車/ダブル中心で点を付ける
+  function rankSetKeys(keys){
+    return keys.map(k=>{
+      const a = k.split("").map(Number);
+      let sc = 0;
+      sc += sum9Bonus(a)*0.9;
+      sc += consecutiveBonus(a)*0.9;
+      sc += doubleTripleBonus(a)*1.0;
+      sc += windmillBonus(k)*0.9;
+      return { n:k, sc };
+    }).sort((A,B)=>B.sc - A.sc);
+  }
+
+  function tierLabel(score, best){
+    if(best <= 0) return { badge:"★", label:"弱" };
+    const r = score / best;
+    if(r >= 0.92) return { badge:"★★★", label:"強" };
+    if(r >= 0.86) return { badge:"★★",  label:"中" };
+    return { badge:"★",   label:"弱" };
+  }
+
+  function splitRanked(ranked, limit=10){
+    if(!ranked || ranked.length === 0) return { main: [], ins: [], rows: [] };
+    const best = ranked[0].sc;
+    const rows = ranked.slice(0, limit).map((r, idx) => {
+      const t = tierLabel(r.sc, best);
+      return { i: idx+1, num: r.n, badge: t.badge, label: t.label, sc: r.sc };
+    });
+    return {
+      rows,
+      main: rows.filter(x => x.label === "強"),
+      ins : rows.filter(x => x.label !== "強")
+    };
+  }
+
+  function formatRows(rows){
+    if(!rows || rows.length === 0) return "（なし）";
+    return rows.map(x => `${x.i}位  ${x.badge} [${x.label}]  ${x.num}`).join("\n");
+  }
+
+  function judgeDayPower(mainCount){
+    if(mainCount >= 5) return "🔥 今日は強い日（集中勝負）";
+    if(mainCount >= 3) return "◎ 普通の日（バランス）";
+    return "△ 分散の日（無理しない）";
+  }
+
+  function setKey(num){
+    return num.split("").sort().join("");
+  }
+
+  // ===== 生成本体 =====
+  function generate(){
+    // prev/prev2 は履歴から同期（運用上の固定）
+    syncPrevFieldsFromHistory();
+
+    // 位別スコア作成（解析の芯）
+    const posScore = buildPositionScores();
+    STATE.posScore = posScore;
+
+    // 位別トップ4表示
+    renderPosOut(posScore);
+
+    // ヒント2つずつ
+    const h1raw = document.getElementById("hint1").value;
+    const h2raw = document.getElementById("hint2").value;
+    const prevStr  = document.getElementById("prev").value;
+    const prev2Str = document.getElementById("prev2").value;
+
+    const h1_2 = pick2FromHint(h1raw, h2raw, posScore, prevStr, prev2Str);
+    const h2_2 = pick2FromHint(h2raw, h1raw, posScore, prevStr, prev2Str);
+
+    // 軸：raw共通最優先
+    const axisArr = chooseAxisFromRaw(h1raw, h2raw, posScore);
+    const axis = axisArr[0] + axisArr[1];
+    STATE.axis = axis;
+
+    // プール作成
+    const pool = buildPoolWeighted(h1_2, h2_2, posScore);
+
+    // シード固定：ヒント + 履歴（中身は表に出さない）
+    const hist = loadHistory().map(x=>x.num).join(",");
+    const seedStr = `${h1raw}|${h2raw}|${prevStr}|${prev2Str}|${hist}`;
+    const rand = mulberry32(hash32(seedStr));
+
+    // 候補生成：軸固定＋残り2桁（重複OKで“偏り”を許容、ただし多様性も確保）
+    const list = [];
+    const seen = new Set();
+    let guard = 0;
+
+    while(list.length < 160 && guard < 9000){
+      guard++;
+      const d2 = pick(pool, rand);
+      const d3 = pick(pool, rand);
+      const n = `${axisArr[0]}${axisArr[1]}${d2}${d3}`;
+      if(seen.has(n)) continue;
+      seen.add(n);
+      list.push(n);
+    }
+
+    // ランク付け
+    const ranked = rankStraight(list, posScore);
+    const top10 = ranked.slice(0, 10);
+    const sp = splitRanked(top10, 10);
+
+    document.getElementById("dayPower").textContent = judgeDayPower(sp.main.length);
+    document.getElementById("straightMain").textContent = formatRows(sp.main);
+    document.getElementById("straightIns").textContent  = formatRows(sp.ins);
+
+    // セット：top10をキー化→ランク
+    const setKeys = uniq(top10.map(r => setKey(r.n)));
+    const setRanked = rankSetKeys(setKeys).slice(0,10);
+    const setSplit = splitRanked(setRanked, 10);
+
+    document.getElementById("setMain").textContent = formatRows(setSplit.main);
+    document.getElementById("setIns").textContent  = formatRows(setSplit.ins);
+
+    // STATE保存（判定用）
+    STATE.topStraightRows = sp.rows;
+    STATE.straightMain = sp.main;
+    STATE.straightIns = sp.ins;
+
+    STATE.topSetRows = setSplit.rows;
+    STATE.setMain = setSplit.main;
+    STATE.setIns = setSplit.ins;
+
+    document.getElementById("judgeOut").innerHTML =
+      `<span class="ok">生成OK</span>（軸 <span class="mono">${STATE.axis}</span>） 結果が出たら当選番号を入れて「判定」してね。`;
+
+    toast("解析→生成 完了");
+  }
+
+  // ===== 判定用 =====
+  function posMatch(a,b){
+    let c=0;
+    for(let i=0;i<4;i++) if(a[i]===b[i]) c++;
+    return c;
+  }
+  function digitMatchCount(a,b){
+    const ca = Array(10).fill(0);
+    const cb = Array(10).fill(0);
+    for(const ch of a) ca[+ch]++;
+    for(const ch of b) cb[+ch]++;
+    let sum=0;
+    for(let i=0;i<10;i++) sum += Math.min(ca[i], cb[i]);
+    return sum;
+  }
+  function inGroup(num, groupRows){
+    return groupRows.find(r => r.num === num) || null;
+  }
+
+  // ===== 結果判定（ストレート＋セット両方）=====
+  function judge(){
+    const win = normalize4(document.getElementById("win").value);
+    const out = document.getElementById("judgeOut");
+
+    if(!win){
+      out.innerHTML = `<span class="warn">当選番号は4桁で入れてね</span>`;
+      return;
+    }
+    if(!STATE.topStraightRows || STATE.topStraightRows.length === 0){
+      out.innerHTML = `<span class="warn">先に「解析して番号を生成」を押してね</span>`;
+      return;
+    }
+
+    const axis = STATE.axis;
+    const axisHit = (win.includes(axis[0]) && win.includes(axis[1])) || (win[0]+win[1]===axis);
+
+    // ストレート：本命/保険/圏内
+    const sMainHit = inGroup(win, STATE.straightMain);
+    const sInsHit  = inGroup(win, STATE.straightIns);
+    const sAnyHit  = inGroup(win, STATE.topStraightRows);
+
+    // セット：キー一致
+    const winKey = setKey(win);
+    const setMainHit = inGroup(winKey, STATE.setMain);
+    const setInsHit  = inGroup(winKey, STATE.setIns);
+    const setAnyHit  = inGroup(winKey, STATE.topSetRows);
+
+    // 近さ
+    let bestPos = 0;
+    let bestDigit = 0;
+    for(const r of STATE.topStraightRows){
+      bestPos = Math.max(bestPos, posMatch(win, r.num));
+      bestDigit = Math.max(bestDigit, digitMatchCount(win, r.num));
+    }
+
+    let headline = "";
+    const detail = [];
+
+    if(sMainHit || setMainHit){
+      headline = "🔥 激アツ（読みが射程圏）";
+    } else if(sInsHit || setInsHit){
+      headline = "◎ 惜しい（流れは合ってる）";
+    } else if(sAnyHit || setAnyHit || bestPos >= 3){
+      headline = "○ 流れOK（あと一歩）";
+    } else if(bestDigit >= 2 || axisHit){
+      headline = "△ 分散の日（無理しない）";
+    } else {
+      headline = "× ズレ（今日は流れ違い）";
+    }
+
+    detail.push(`当選：<span class="mono">${win}</span>`);
+    detail.push(`軸：<span class="mono">${axis}</span>　/　軸一致：<span class="${axisHit?'ok':'warn'}">${axisHit?'○':'×'}</span>`);
+
+    if(sMainHit){
+      detail.push(`ストレート：<span class="ok">本命（強）</span>　${sMainHit.i}位`);
+    } else if(sInsHit){
+      detail.push(`ストレート：<span class="ok">保険（中・弱）</span>　${sInsHit.i}位`);
+    } else if(sAnyHit){
+      detail.push(`ストレート：<span class="ok">圏内</span>　${sAnyHit.i}位`);
+    } else {
+      detail.push(`ストレート：圏外（近さ：位置一致max ${bestPos}/4、数字一致max ${bestDigit}/4）`);
+    }
+
+    if(setMainHit){
+      detail.push(`セット：<span class="ok">本命（強）</span>　${setMainHit.i}位（キー ${winKey}）`);
+    } else if(setInsHit){
+      detail.push(`セット：<span class="ok">保険（中・弱）</span>　${setInsHit.i}位（キー ${winKey}）`);
+    } else if(setAnyHit){
+      detail.push(`セット：<span class="ok">圏内</span>　${setAnyHit.i}位（キー ${winKey}）`);
+    } else {
+      detail.push(`セット：圏外（キー ${winKey}）`);
+    }
+
+    out.innerHTML =
+      `<div class="big">${headline}</div>` +
+      `<div style="margin-top:8px;line-height:1.7">${detail.map(x=>`・${x}`).join("<br>")}</div>`;
+  }
+
+  // ===== 初期化 =====
+  (function init(){
+    // 履歴が空なら内蔵を流し込む（loadHistoryがやる）
+    loadHistory();
+    // prev/prev2 反映
+    syncPrevFieldsFromHistory();
+
+    // 雰囲気で位別候補だけ先に出しておく（ヒント無しでも“解析してる感”は見える）
+    const hist = loadHistory();
+    if(hist.length >= 20){
+      const posScore = buildPositionScores();
+      STATE.posScore = posScore;
+      renderPosOut(posScore);
+      document.getElementById("judgeOut").innerHTML =
+        `<span class="ok">準備OK</span>（内部データ ${hist.length}件） ヒント入れて「解析して番号を生成」してね。`;
+    }else{
+      document.getElementById("judgeOut").innerHTML =
+        `<span class="ok">準備OK</span> まずは「抽選結果を保存」してデータを育ててね。`;
+    }
+  })();
 </script>
+
 </body>
 </html>
