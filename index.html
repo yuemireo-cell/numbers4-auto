@@ -24,6 +24,8 @@
     .ok{color:#0a7;font-weight:900}
     .warn{color:#b00020;font-weight:900}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row > *{flex:1;min-width:220px}
   </style>
 </head>
 <body>
@@ -43,14 +45,10 @@
     <div class="label">前々回（任意）</div>
     <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4">
 
-    <div class="label">直近10回（任意・コピペOK）</div>
-    <textarea id="recent" placeholder="例：
-4141→2121→7202→7526→2300→7263→1632→6551→2827→2699"></textarea>
-
     <div class="note">
-      ※直近10回は<strong>手入力不要</strong>。ネットの結果を<strong>そのままコピーして貼るだけ</strong>でOK（文字は無視して数字だけ拾う）<br>
-      ※同じ入力なら何回押しても同じ結果（ブレない）<br>
-      ※18時ギリギリのリハーサル数字は入力しない（ゆうちゃん方針）
+      ✅ 直近データは<strong>入力不要</strong>（内蔵100回の履歴を使って解析）<br>
+      ✅ 同じ入力＋同じ履歴なら何回押しても同じ結果（ブレない）<br>
+      ✅ 18時ギリギリのリハーサル数字は保存しない（ゆうちゃん方針）
     </div>
 
     <button type="button" onclick="generate()">番号を生成する</button>
@@ -59,7 +57,11 @@
   <div class="resultBox">
     <div class="label">当選番号（結果が出たらここに4桁）</div>
     <input id="win" inputmode="numeric" placeholder="例：7263" maxlength="4">
-    <button type="button" onclick="judge()">結果を判定する</button>
+
+    <div class="row">
+      <button type="button" onclick="judge()">結果を判定する</button>
+      <button type="button" onclick="saveLatestDraw()">当選番号を保存（内蔵100回）</button>
+    </div>
 
     <div id="judgeOut" class="mono" style="margin-top:10px;"></div>
     <div class="note">※判定は「ストレート＋セット」両方を見る（ゆうちゃん指定）</div>
@@ -83,8 +85,76 @@
   <pre id="setIns">（ここに出ます）</pre>
 
 <script>
+/**
+ * ==========================
+ * 🧠 内蔵100回データの混ぜ方：設計図（コメント）
+ * ==========================
+ * 目的：
+ * - 直近10回入力欄を廃止し、localStorageに保存した「最大100回」の抽選履歴を解析に使う
+ *
+ * データ構造（localStorage）：
+ * - KEY: "N4_HISTORY_V1"
+ * - VALUE: JSON配列 ["9827","6120",...]
+ *
+ * 評価に混ぜる（scoreDigits）：
+ * - 履歴の出現頻度を桁ごとにカウント（0〜9）
+ * - 重み付け（例）
+ *   - 最新〜10件：重み3
+ *   - 11〜30件：重み2
+ *   - 31〜100件：重み1
+ * - さらに「最後の回（最新1件）」の数字は “引っ張り” として別加点も可能（今回は rank 側でも加点）
+ *
+ * これで：
+ * - 直近10回は見えない内部に保存され、毎回の生成がどんどん“自分専用”に育つ
+ */
+
+/**
+ * ==========================
+ * 🔥 ナンちゃん法則の数値化案（コメント）
+ * ==========================
+ * 画像にある要素を「候補4桁の評価スコア」に加点する（＝強化加点）
+ *
+ * (A) 裏数字（表裏）：0↔5,1↔6,2↔7,3↔8,4↔9
+ *  - 候補に「ヒント2桁/軸/引っ張り数字」の裏が入っていたら加点
+ *
+ * (B) 1ズレ（±2相当のペア）：0-2,1-3,2-4,3-5,4-6,5-7,6-8,7-9,8-0,9-1
+ *  - 候補にこのペアが含まれるたび加点
+ *
+ * (C) 2ズレ（±3相当のペア）：0-3,1-4,2-5,3-6,4-7,5-8,6-9,7-0,8-1,9-2
+ *  - 候補にこのペアが含まれるたび加点
+ *
+ * (D) ダブル（00,11,...,99）
+ *  - 候補にダブルがあれば加点
+ *  - さらにその数字が「ヒント・引っ張り・履歴上位」なら追加加点（“本命にも可”）
+ *
+ * (E) 既存の「足す9」「連番」も維持しつつ、(A)〜(D)を上乗せして完成度を上げる
+ */
+
   // ===== 設定：裏数字（ゆうちゃん定義）=====
   const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
+
+  // ===== 内蔵履歴（最大100）=====
+  const HISTORY_KEY = "N4_HISTORY_V1";
+  function loadHistory(){
+    try{
+      const raw = localStorage.getItem(HISTORY_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(x => typeof x === "string") : [];
+    }catch(e){
+      return [];
+    }
+  }
+  function saveHistory(arr){
+    try{
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(arr));
+    }catch(e){}
+  }
+  function historyHash(arr){
+    // 同じ履歴なら同じ生成になるためのシード材料
+    // 長くなりすぎないように末尾寄りだけ連結
+    const tail = arr.slice(-100).join(",");
+    return tail;
+  }
 
   // ===== 状態保持（生成結果を判定に使う）=====
   const STATE = {
@@ -126,12 +196,26 @@
     return pool[Math.floor(rand() * pool.length)];
   }
 
-  // ===== 材料スコア（直近/前回/前々回）=====
-  function scoreDigits(){
+  // ===== 内蔵履歴を使った「材料スコア」=====
+  function scoreDigitsFromHistory(){
     const s = Array(10).fill(0);
-    digits(document.getElementById("recent").value).forEach(x => s[+x] += 1);
-    digits(document.getElementById("prev").value).forEach(x => s[+x] += 3);
-    digits(document.getElementById("prev2").value).forEach(x => s[+x] += 2);
+    const hist = loadHistory(); // ["9827",...]
+    const N = hist.length;
+
+    // 重み：最新ほど強い
+    // latest 1..10 => +3, 11..30 => +2, 31..100 => +1
+    for(let idx = 0; idx < N; idx++){
+      const num = hist[idx];
+      const posFromEnd = (N - 1) - idx; // 0が最新
+      let w = 1;
+      if(posFromEnd <= 9) w = 3;
+      else if(posFromEnd <= 29) w = 2;
+
+      const ds = digits(num).slice(0,4);
+      if(ds.length === 4){
+        ds.forEach(ch => s[+ch] += w);
+      }
+    }
     return s;
   }
 
@@ -145,11 +229,11 @@
 
     const score = (d) => {
       let sc = 0;
-      sc += (s?.[d] ?? 0) * 10;      // 出現の濃さ
+      sc += (s?.[d] ?? 0) * 10;      // 履歴濃さ
       if (pull.has(d)) sc += 30;     // 引っ張り強め
       sc += 2;                       // 基礎点
-      if (me.some(x => x !== d && x + d === 9)) sc += 15; // 足す9
-      if (me.some(x => x !== d && Math.abs(x - d) === 1)) sc += 8; // 連番
+      if (me.some(x => x !== d && x + d === 9)) sc += 15; // 足す9（ヒント内）
+      if (me.some(x => x !== d && Math.abs(x - d) === 1)) sc += 8; // 連番（ヒント内）
       return sc;
     };
 
@@ -219,7 +303,7 @@
       if(n < 9) p.push(String(n+1));
     }
 
-    // スコア重み
+    // 履歴スコア重み
     for(let d=0; d<=9; d++){
       const w = (s[d] ?? 0);
       for(let i=0;i<w;i++) p.push(String(d));
@@ -230,15 +314,95 @@
     return p;
   }
 
-  // ===== ランキング（足す9 / 連番）=====
-  function rank(nums){
+  // ===== ナンちゃん法則（強化加点）=====
+  const SHIFT1 = [
+    [0,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6,8],[7,9],[8,0],[9,1]
+  ];
+  const SHIFT2 = [
+    [0,3],[1,4],[2,5],[3,6],[4,7],[5,8],[6,9],[7,0],[8,1],[9,2]
+  ];
+
+  function countPairHit(digitsArr, pair){
+    const [a,b] = pair;
+    const set = new Set(digitsArr);
+    return (set.has(a) && set.has(b)) ? 1 : 0;
+  }
+
+  function hasDouble(numStr){
+    // "0012" でも "00" を拾う
+    for(let i=0;i<3;i++){
+      if(numStr[i] === numStr[i+1]) return true;
+    }
+    return false;
+  }
+
+  function doublesIn(numStr){
+    const out = [];
+    for(let i=0;i<3;i++){
+      if(numStr[i] === numStr[i+1]) out.push(+numStr[i]);
+    }
+    return out; // [0] みたいにダブルの数字
+  }
+
+  function nanchanBonus(numStr, ctx){
+    // ctx: {axisArr, h1_2, h2_2, prevStr, prev2Str, sDigit}
+    const ds = numStr.split("").map(x=>+x);
+    let sc = 0;
+
+    // (A) 裏数字：軸/ヒント/引っ張り由来の裏が入ると加点
+    const keyDigits = [];
+    keyDigits.push(...ctx.axisArr.map(x=>+x));
+    keyDigits.push(...ctx.h1_2.map(x=>+x));
+    keyDigits.push(...ctx.h2_2.map(x=>+x));
+    digits(ctx.prevStr).forEach(x=>keyDigits.push(+x));
+    digits(ctx.prev2Str).forEach(x=>keyDigits.push(+x));
+
+    const keySet = new Set(keyDigits);
+    for(const kd of keySet){
+      const ud = ura[kd];
+      if(ud !== undefined && ds.includes(ud)) sc += 6; // 裏が刺さった
+    }
+
+    // (B) 1ズレ
+    for(const p of SHIFT1){
+      if(countPairHit(ds, p)) sc += 5;
+    }
+
+    // (C) 2ズレ
+    for(const p of SHIFT2){
+      if(countPairHit(ds, p)) sc += 4;
+    }
+
+    // (D) ダブル
+    const dubs = doublesIn(numStr);
+    if(dubs.length > 0){
+      sc += 10; // ダブル自体の加点
+      // ダブルの数字が「ヒント/軸/引っ張り/履歴上位」なら追加加点（本命にも可）
+      for(const d of dubs){
+        if(keySet.has(d)) sc += 8;
+        // 履歴濃さ上位なら加点（閾値は雑に：s[d]が高いほど）
+        if((ctx.sDigit?.[d] ?? 0) >= 6) sc += 6;
+      }
+    }
+
+    return sc;
+  }
+
+  // ===== ランキング（足す9 / 連番 + ナンちゃん強化加点）=====
+  function rank(nums, ctx){
     return nums.map(n=>{
       let sc=0;
       const a = n.split("").map(Number);
+
+      // 既存：足す9 / 連番
       for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
         if(a[i]+a[j]===9) sc += 3;
         if(Math.abs(a[i]-a[j])===1) sc += 2;
       }
+
+      // 強化：ナンちゃん法則
+      sc += nanchanBonus(n, ctx);
+
       return { n, sc };
     }).sort((A,B)=>B.sc - A.sc);
   }
@@ -312,9 +476,35 @@
     return num.split("").sort().join("");
   }
 
+  // ===== 保存ボタン：当選番号を内蔵100回に追記 =====
+  function saveLatestDraw(){
+    const win = normalize4(document.getElementById("win").value);
+    const out = document.getElementById("judgeOut");
+
+    if(!win){
+      out.innerHTML = `<span class="warn">保存するには、当選番号を4桁で入れてね</span>`;
+      return;
+    }
+
+    // 18時ギリギリのリハーサル数字は保存しない方針 → ここでは「自分で入力したもの」を保存するだけ
+    // （＝ゆうちゃんが“これは本番”と判断した数字だけ保存される）
+
+    let hist = loadHistory();
+    hist.push(win);
+
+    // 100超えたら古いのを1つ消す
+    if(hist.length > 100){
+      hist = hist.slice(hist.length - 100);
+    }
+    saveHistory(hist);
+
+    out.innerHTML =
+      `<span class="ok">保存しました</span>（内蔵履歴：最大100回） / いまの保存：<span class="mono">${win}</span>`;
+  }
+
   // ===== 生成本体 =====
   function generate(){
-    const s = scoreDigits();
+    const s = scoreDigitsFromHistory(); // 内蔵履歴ベース
 
     const prevStr  = document.getElementById("prev").value;
     const prev2Str = document.getElementById("prev2").value;
@@ -334,11 +524,11 @@
     // プール（重み付き）
     const pool = buildPoolWeighted(h1_2, h2_2, s);
 
-    // 入力全部からシード固定（同じ入力→同じ結果）
+    // 入力＋履歴からシード固定（同じ入力＋同じ履歴→同じ結果）
     const seedStr =
       h1raw + "|" + h2raw + "|" +
       prevStr + "|" + prev2Str + "|" +
-      document.getElementById("recent").value;
+      historyHash(loadHistory());
 
     const rand = mulberry32(hash32(seedStr));
 
@@ -350,8 +540,18 @@
       list.push(n.join(""));
     }
 
-    // ユニーク→ランク
-    const ranked = rank(uniq(list));
+    // rankに渡すコンテキスト（ナンちゃん加点の材料）
+    const ctx = {
+      axisArr,
+      h1_2,
+      h2_2,
+      prevStr,
+      prev2Str,
+      sDigit: s
+    };
+
+    // ユニーク→ランク（強化加点込み）
+    const ranked = rank(uniq(list), ctx);
     const top10 = ranked.slice(0, 10);
     const sp = splitRanked(top10, 10);
 
@@ -359,9 +559,10 @@
     document.getElementById("straightMain").textContent = formatRows(sp.main);
     document.getElementById("straightIns").textContent  = formatRows(sp.ins);
 
-    // セット：top10をセットキーにしてランク
+    // セット：top10をセットキーにしてランク（同じ評価ロジックをセットキーにも適用）
+    // ※セットは「キー」が4桁だが、評価は“構成数字”を見るのでそのままOK
     const setNums = uniq(top10.map(r => setKey(r.n)));
-    const setRanked = rank(setNums).slice(0,10);
+    const setRanked = rank(setNums, ctx).slice(0,10);
     const setSplit = splitRanked(setRanked, 10);
 
     document.getElementById("setMain").textContent = formatRows(setSplit.main);
@@ -418,10 +619,6 @@
       bestPos = Math.max(bestPos, posMatch(win, r.num));
       bestDigit = Math.max(bestDigit, digitMatchCount(win, r.num));
     }
-
-    // セット一致度（順不同なのでdigitは常に4、キー一致以外は評価控えめ）
-    // ※セットは「キー一致」を強いシグナルとして扱う
-    const setHit = !!setAnyHit;
 
     // 判定ランク（ゆうちゃん向け：納得できるやつ）
     let headline = "";
