@@ -14,16 +14,18 @@
     .label{font-weight:900;margin-top:6px}
     pre{white-space:pre-wrap;background:#f7f7f7;border-radius:14px;padding:12px;border:1px solid #eee}
     .day{font-weight:900;margin:8px 0 0}
-    .note{color:#666;font-size:12px;margin-top:6px;line-height:1.5}
+    .note{color:#666;font-size:12px;margin-top:6px;line-height:1.6}
     h2{margin-top:22px}
     h3{margin:12px 0 6px}
-    .resultBox{
-      background:#fff;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px
-    }
+    .resultBox{background:#fff;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px}
     .big{font-size:18px;font-weight:900}
     .ok{color:#0a7;font-weight:900}
     .warn{color:#b00020;font-weight:900}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row > *{flex:1 1 240px}
+    .ghost{display:none !important;}
+    .miniBtn{padding:12px;font-weight:900}
   </style>
 </head>
 <body>
@@ -37,18 +39,23 @@
     <div class="label">ヒント2（例：3920 / 3・9・2・0）</div>
     <input id="hint2" inputmode="numeric" placeholder="ヒント2 例：3920">
 
-    <div class="label">前回（任意）</div>
-    <input id="prev" inputmode="numeric" placeholder="前回 例：5105" maxlength="4">
+    <div class="row">
+      <div>
+        <div class="label">前回（任意）</div>
+        <input id="prev" inputmode="numeric" placeholder="前回 例：5105" maxlength="4">
+      </div>
+      <div>
+        <div class="label">前々回（任意）</div>
+        <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4">
+      </div>
+    </div>
 
-    <div class="label">前々回（任意）</div>
-    <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4">
-
-    <div class="label">直近10回（任意・コピペOK）</div>
-    <textarea id="recent" placeholder="例：
-4141→2121→7202→7526→2300→7263→1632→6551→2827→2699"></textarea>
+    <!-- 直近10回入力欄は「廃止」：UIには出さない（内蔵） -->
+    <!-- ただし過去コード互換のため、内部には残し、localStorageの履歴から自動生成して使う -->
+    <textarea id="recent" class="ghost"></textarea>
 
     <div class="note">
-      ※直近10回は<strong>手入力不要</strong>。ネットの結果を<strong>そのままコピーして貼るだけ</strong>でOK（文字は無視して数字だけ拾う）<br>
+      ※直近データは<strong>内蔵保存（最大100回）</strong>を解析に使う（手入力なし）<br>
       ※同じ入力なら何回押しても同じ結果（ブレない）<br>
       ※18時ギリギリのリハーサル数字は入力しない（ゆうちゃん方針）
     </div>
@@ -59,10 +66,18 @@
   <div class="resultBox">
     <div class="label">当選番号（結果が出たらここに4桁）</div>
     <input id="win" inputmode="numeric" placeholder="例：7263" maxlength="4">
-    <button type="button" onclick="judge()">結果を判定する</button>
+
+    <div class="row">
+      <button class="miniBtn" type="button" onclick="judge()">結果を判定する</button>
+      <button class="miniBtn" type="button" onclick="saveWin()">当選番号を保存する（最大100）</button>
+    </div>
 
     <div id="judgeOut" class="mono" style="margin-top:10px;"></div>
-    <div class="note">※判定は「ストレート＋セット」両方を見る（ゆうちゃん指定）</div>
+
+    <div class="note">
+      ※判定は「ストレート＋セット」両方を見る（ゆうちゃん指定）<br>
+      ※保存した履歴は端末内に保持（localStorage）。同じ端末・同じブラウザで残る
+    </div>
   </div>
 
   <h2>ストレート（ランキング）</h2>
@@ -83,18 +98,25 @@
   <pre id="setIns">（ここに出ます）</pre>
 
 <script>
-  // ===== 設定：裏数字（ゆうちゃん定義）=====
+  // =========================================================
+  // 0) 内蔵保存（最大100回）— ゆうちゃん仕様
+  // =========================================================
+  const STORAGE_KEY = "n4_history_v2"; // v2: 今回の内蔵履歴
+  const HISTORY_MAX = 100;
+
+  // ===== 裏数字（ゆうちゃん定義）=====
   const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
 
   // ===== 状態保持（生成結果を判定に使う）=====
   const STATE = {
     axis: "48",
     topStraightRows: [], // [{i,num,badge,label,sc}]
-    topSetRows: [],      // 同上（numはセットキー＝並べ替え）
+    topSetRows: [],      // 同上（numはセットキー）
     straightMain: [],
     straightIns: [],
     setMain: [],
     setIns: [],
+    lastAnalysis: null,  // 履歴解析キャッシュ
   };
 
   // ===== ユーティリティ =====
@@ -103,6 +125,14 @@
     const s = new Set(), out=[];
     for(const x of arr){ if(!s.has(x)){ s.add(x); out.push(x); } }
     return out;
+  }
+  function normalize4(str){
+    const d = digits(str).slice(0,4);
+    if(d.length !== 4) return null;
+    return d.join("");
+  }
+  function setKey(num){
+    return num.split("").sort().join("");
   }
 
   // 同じ入力なら同じ乱数列（固定）
@@ -126,16 +156,161 @@
     return pool[Math.floor(rand() * pool.length)];
   }
 
-  // ===== 材料スコア（直近/前回/前々回）=====
+  // =========================================================
+  // 1) 履歴の読み書き（内蔵）
+  // =========================================================
+  function getHistory(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      if(!Array.isArray(arr)) return [];
+      // "4桁"だけに正規化
+      return arr.map(x => normalize4(String(x))).filter(Boolean);
+    }catch(e){
+      return [];
+    }
+  }
+
+  function setHistory(arr){
+    const clean = (arr || []).map(x => normalize4(String(x))).filter(Boolean);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean.slice(0, HISTORY_MAX)));
+  }
+
+  function addToHistory(num4){
+    let h = getHistory();
+    h.unshift(num4);
+    if(h.length > HISTORY_MAX) h = h.slice(0, HISTORY_MAX);
+    setHistory(h);
+    return h;
+  }
+
+  // 互換のため recent テキストを内部生成（UIには出さない）
+  function syncHiddenRecentFromHistory(){
+    const h = getHistory();
+    // 直近10回ぶんを "→" で繋いで、digits() が拾える形に
+    const last10 = h.slice(0, 10);
+    document.getElementById("recent").value = last10.join("→");
+    return h;
+  }
+
+  // 保存ボタン（当選番号）
+  function saveWin(){
+    const win = normalize4(document.getElementById("win").value);
+    const out = document.getElementById("judgeOut");
+
+    if(!win){
+      out.innerHTML = `<span class="warn">当選番号は4桁で入れてね</span>`;
+      return;
+    }
+
+    const h = addToHistory(win);
+    syncHiddenRecentFromHistory();
+
+    out.innerHTML =
+      `<div class="big"><span class="ok">保存OK</span></div>` +
+      `<div style="margin-top:8px;line-height:1.7">` +
+      `・保存：<span class="mono">${win}</span><br>` +
+      `・履歴件数：<span class="mono">${h.length}</span>（最大 ${HISTORY_MAX}）<br>` +
+      `・直近10は内蔵から自動反映` +
+      `</div>`;
+  }
+
+  // 初期同期（ページを開いた時点で直近10が内蔵から入る）
+  syncHiddenRecentFromHistory();
+
+  // =========================================================
+  // 2) 100回データを評価に混ぜる設計（実装）
+  //    - 出現頻度（直近ほど重く）
+  //    - 位置クセ（千/百/十/一）
+  //    - 相性（同じ回に出やすいペア）
+  // =========================================================
+  function analyzeHistory(history){
+    const h = (history || []).map(String).filter(x => x.length === 4);
+
+    // 位置クセ: posCount[pos][digit]
+    const posCount = Array.from({length:4}, ()=>Array(10).fill(0));
+
+    // 出現: freq[digit]
+    const freq = Array(10).fill(0);
+
+    // 相性ペア: pairCount[a][b] (a<b)
+    const pairCount = Array.from({length:10}, ()=>Array(10).fill(0));
+
+    // 直近重み: iが小さいほど重い
+    // 設計：0-9回:2.0 / 10-29回:1.0 / 30-99回:0.5
+    const wByIndex = (i)=>{
+      if(i < 10) return 2.0;
+      if(i < 30) return 1.0;
+      return 0.5;
+    };
+
+    for(let i=0;i<h.length;i++){
+      const num = h[i];
+      const w = wByIndex(i);
+      const a = num.split("").map(ch=>+ch);
+
+      // freq & pos
+      for(let p=0;p<4;p++){
+        freq[a[p]] += w;
+        posCount[p][a[p]] += w;
+      }
+
+      // pair（同じ回に出た数字同士）
+      // 重複も考慮するが、相性は「存在」寄りでuniq化
+      const u = uniq(a.map(String)).map(Number);
+      for(let x=0;x<u.length;x++){
+        for(let y=x+1;y<u.length;y++){
+          const d1 = Math.min(u[x], u[y]);
+          const d2 = Math.max(u[x], u[y]);
+          pairCount[d1][d2] += w;
+        }
+      }
+    }
+
+    // 正規化用の最大値
+    const maxFreq = Math.max(...freq, 1);
+    const maxPos = posCount.map(row => Math.max(...row, 1));
+    let maxPair = 1;
+    for(let i=0;i<10;i++) for(let j=i+1;j<10;j++) maxPair = Math.max(maxPair, pairCount[i][j], 1);
+
+    return { freq, maxFreq, posCount, maxPos, pairCount, maxPair };
+  }
+
+  function getHistoryAnalysis(){
+    const h = syncHiddenRecentFromHistory();
+    // キャッシュ（同一履歴なら再計算しない：軽量化）
+    const key = h.join(",");
+    if(STATE.lastAnalysis && STATE.lastAnalysis._key === key) return STATE.lastAnalysis;
+    const a = analyzeHistory(h);
+    a._key = key;
+    STATE.lastAnalysis = a;
+    return a;
+  }
+
+  // =========================================================
+  // 3) 材料スコア（内蔵履歴 + 前回/前々回）
+  // =========================================================
   function scoreDigits(){
+    // 内蔵履歴から集計
+    const analysis = getHistoryAnalysis();
     const s = Array(10).fill(0);
-    digits(document.getElementById("recent").value).forEach(x => s[+x] += 1);
+
+    // 基本：freqをそのまま（正規化して強すぎないように）
+    for(let d=0; d<=9; d++){
+      const norm = analysis.freq[d] / analysis.maxFreq; // 0..1
+      s[d] += norm * 10; // 0..10（基礎）
+    }
+
+    // 前回+3 / 前々回+2（ゆうちゃん「引っ張り」）
     digits(document.getElementById("prev").value).forEach(x => s[+x] += 3);
     digits(document.getElementById("prev2").value).forEach(x => s[+x] += 2);
+
     return s;
   }
 
-  // ===== 「必ず2つだけ」ヒント選抜（共通最優先）=====
+  // =========================================================
+  // 4) ヒントの「必ず2つだけ」選抜（共通最優先）
+  // =========================================================
   function pick2FromHint(meStr, s, prevStr, prev2Str, otherStr){
     const me = uniq(digits(meStr)).map(Number);
     const other = new Set(uniq(digits(otherStr)).map(Number));
@@ -145,15 +320,15 @@
 
     const score = (d) => {
       let sc = 0;
-      sc += (s?.[d] ?? 0) * 10;      // 出現の濃さ
-      if (pull.has(d)) sc += 30;     // 引っ張り強め
-      sc += 2;                       // 基礎点
+      sc += (s?.[d] ?? 0) * 10;                 // 濃さ（内蔵履歴 + 前回/前々回）
+      if (pull.has(d)) sc += 30;                // 引っ張り強め
+      sc += 2;                                  // 基礎点
       if (me.some(x => x !== d && x + d === 9)) sc += 15; // 足す9
       if (me.some(x => x !== d && Math.abs(x - d) === 1)) sc += 8; // 連番
       return sc;
     };
 
-    // 共通を最優先で残す
+    // 共通最優先
     const commons = me.filter(x => other.has(x));
     if (commons.length >= 2){
       return commons.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
@@ -164,7 +339,7 @@
       return [String(commons[0]), String(second)];
     }
 
-    // 共通なし：スコア上位2つ（必ず2つ）
+    // 共通なし：上位2つ（必ず2つ）
     if (me.length >= 2){
       return me.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
     }
@@ -173,10 +348,10 @@
       candidates.sort((a,b)=>score(b)-score(a));
       return [String(me[0]), String(candidates[0] ?? me[0])];
     }
-    return ["4","8"]; // 空の保険
+    return ["4","8"];
   }
 
-  // ===== 軸2桁決定：間引く前の「共通」を最優先 =====
+  // 軸2桁：間引く前の共通を最優先
   function chooseAxisFromRaw(h1raw, h2raw, s){
     const a = uniq(digits(h1raw)).map(Number);
     const b = uniq(digits(h2raw)).map(Number);
@@ -201,7 +376,9 @@
     return ["4","8"];
   }
 
-  // ===== プール作成（重み付き：重複を残す）=====
+  // =========================================================
+  // 5) プール（重み付き）— ヒント2個 + 裏 + 連番 + 履歴濃さ
+  // =========================================================
   function buildPoolWeighted(h1_2, h2_2, s){
     let p = [];
     p.push(...h1_2, ...h2_2);
@@ -219,26 +396,114 @@
       if(n < 9) p.push(String(n+1));
     }
 
-    // スコア重み
+    // スコア重み（内蔵履歴の濃さが強い数字ほど出やすく）
     for(let d=0; d<=9; d++){
-      const w = (s[d] ?? 0);
+      const w = Math.max(0, Math.round((s[d] ?? 0))); // 整数化
       for(let i=0;i<w;i++) p.push(String(d));
     }
 
-    // 保険（最低限）
+    // 最低限の全数字（保険）
     p.push("0","1","2","3","4","5","6","7","8","9");
     return p;
   }
 
-  // ===== ランキング（足す9 / 連番）=====
+  // =========================================================
+  // 6) ナンちゃん法則（強化加点）— 数値化案を実装
+  //    ※「評価加点として入れる」「本命にも可」→ rank()に合流
+  // =========================================================
+  function nanchanBonus(num){
+    // ---- 数値化案（これが“設計図”のコア）----
+    // A) 表裏セット（0-5,1-6,2-7,3-8,4-9）が同居 → +4
+    // B) ダブル（00,11,...）が含まれる → +3
+    // C) 1ズレ（差2のペア：0-2,1-3,...,8-0,9-1）→ +2
+    // D) 2ズレ（差3のペア：0-3,1-4,...,7-0,8-1,9-2）→ +2
+    // E) 裏数字の“連動”が2組以上 → 追加 +2
+    const a = num.split("").map(ch=>+ch);
+
+    // pair helper
+    const hasPair = (d1,d2)=>{
+      const s = new Set(a);
+      return s.has(d1) && s.has(d2);
+    };
+
+    let bonus = 0;
+
+    // A) 表裏同居
+    let uraPairs = 0;
+    for(let d=0; d<=4; d++){
+      const u = ura[d];
+      if(hasPair(d,u)) uraPairs++;
+    }
+    if(uraPairs >= 1) bonus += 4;
+    if(uraPairs >= 2) bonus += 2; // E)
+
+    // B) ダブル（連続同数字）
+    if(/00|11|22|33|44|55|66|77|88|99/.test(num)) bonus += 3;
+
+    // C) 1ズレ（差2, mod10）
+    const setA = new Set(a);
+    const diff2Pairs = [[0,2],[1,3],[2,4],[3,5],[4,6],[5,7],[6,8],[7,9],[8,0],[9,1]];
+    if(diff2Pairs.some(([x,y])=> setA.has(x) && setA.has(y))) bonus += 2;
+
+    // D) 2ズレ（差3, mod10）
+    const diff3Pairs = [[0,3],[1,4],[2,5],[3,6],[4,7],[5,8],[6,9],[7,0],[8,1],[9,2]];
+    if(diff3Pairs.some(([x,y])=> setA.has(x) && setA.has(y))) bonus += 2;
+
+    return bonus;
+  }
+
+  // =========================================================
+  // 7) ランキング（ゆうちゃん理論 + 内蔵100回補正 + ナンちゃん加点）
+  // =========================================================
   function rank(nums){
-    return nums.map(n=>{
-      let sc=0;
-      const a = n.split("").map(Number);
-      for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
-        if(a[i]+a[j]===9) sc += 3;
-        if(Math.abs(a[i]-a[j])===1) sc += 2;
+    const analysis = getHistoryAnalysis();
+
+    const posScore = (num)=>{
+      // 位置クセ：その位置で出やすい数字ほど加点（0..1→最大+2）
+      let sc = 0;
+      const a = num.split("").map(ch=>+ch);
+      for(let p=0;p<4;p++){
+        const norm = (analysis.posCount[p][a[p]] / (analysis.maxPos[p] || 1));
+        sc += norm * 2; // pos合計で最大+8程度
       }
+      return sc;
+    };
+
+    const pairScore = (num)=>{
+      // 相性：同じ回に一緒に出やすいペアを加点（0..1→最大+3）
+      const a = uniq(num.split("")).map(Number);
+      let sum = 0;
+      let pairs = 0;
+      for(let i=0;i<a.length;i++){
+        for(let j=i+1;j<a.length;j++){
+          const d1 = Math.min(a[i], a[j]);
+          const d2 = Math.max(a[i], a[j]);
+          const v = analysis.pairCount[d1][d2] / (analysis.maxPair || 1);
+          sum += v;
+          pairs++;
+        }
+      }
+      if(pairs === 0) return 0;
+      return (sum / pairs) * 3; // 平均相性 * 3
+    };
+
+    return nums.map(n=>{
+      let sc = 0;
+      const a = n.split("").map(Number);
+
+      // ゆうちゃん：足す9 / 連番
+      for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
+        if(a[i]+a[j]===9) sc += 3;            // 足す9
+        if(Math.abs(a[i]-a[j])===1) sc += 2; // 連番
+      }
+
+      // 内蔵100回：位置クセ + 相性
+      sc += posScore(n);
+      sc += pairScore(n);
+
+      // ナンちゃん法則：強化加点
+      sc += nanchanBonus(n);
+
       return { n, sc };
     }).sort((A,B)=>B.sc - A.sc);
   }
@@ -280,20 +545,14 @@
     return "△ 分散の日（無理しない）";
   }
 
-  // ===== 判定用ヘルパー =====
-  function normalize4(str){
-    const d = digits(str).slice(0,4);
-    if(d.length !== 4) return null;
-    return d.join("");
-  }
-
+  // =========================================================
+  // 8) 判定ロジック（ストレート＋セット）
+  // =========================================================
   function posMatch(a,b){
     let c=0;
     for(let i=0;i<4;i++) if(a[i]===b[i]) c++;
     return c;
   }
-
-  // multisetの一致数（順不同）
   function digitMatchCount(a,b){
     const ca = Array(10).fill(0);
     const cb = Array(10).fill(0);
@@ -303,17 +562,17 @@
     for(let i=0;i<10;i++) sum += Math.min(ca[i], cb[i]);
     return sum;
   }
-
   function inGroup(num, groupRows){
     return groupRows.find(r => r.num === num) || null;
   }
 
-  function setKey(num){
-    return num.split("").sort().join("");
-  }
-
-  // ===== 生成本体 =====
+  // =========================================================
+  // 9) 生成本体
+  // =========================================================
   function generate(){
+    // 内蔵履歴を同期（直近10も内側で更新）
+    syncHiddenRecentFromHistory();
+
     const s = scoreDigits();
 
     const prevStr  = document.getElementById("prev").value;
@@ -322,7 +581,7 @@
     const h1raw = document.getElementById("hint1").value;
     const h2raw = document.getElementById("hint2").value;
 
-    // ヒントは必ず2つに矯正（共通優先）
+    // ヒントは必ず2つ（共通優先）
     const h1_2 = pick2FromHint(h1raw, s, prevStr, prev2Str, h2raw);
     const h2_2 = pick2FromHint(h2raw, s, prevStr, prev2Str, h1raw);
 
@@ -334,15 +593,17 @@
     // プール（重み付き）
     const pool = buildPoolWeighted(h1_2, h2_2, s);
 
-    // 入力全部からシード固定（同じ入力→同じ結果）
+    // 入力+内蔵履歴でシード固定（履歴が増えれば“同じ入力”でも変化する）
+    // → 「育つツール」になる
+    const historySeed = getHistory().join(",");
     const seedStr =
       h1raw + "|" + h2raw + "|" +
       prevStr + "|" + prev2Str + "|" +
-      document.getElementById("recent").value;
+      historySeed;
 
     const rand = mulberry32(hash32(seedStr));
 
-    // 候補100本（同じ入力なら同じ100本）
+    // 候補100本
     let list = [];
     while(list.length < 100){
       let n = [axisArr[0], axisArr[1]];
@@ -376,12 +637,17 @@
     STATE.setMain = setSplit.main;
     STATE.setIns = setSplit.ins;
 
-    // 生成直後は判定表示を軽くリセット
+    // 生成直後は判定表示をリセット
+    const hCount = getHistory().length;
     document.getElementById("judgeOut").innerHTML =
-      `<span class="ok">生成OK</span>（軸 <span class="mono">${STATE.axis}</span>）  結果が出たら当選番号を入れて「判定」してね。`;
+      `<span class="ok">生成OK</span>（軸 <span class="mono">${STATE.axis}</span>）` +
+      ` / 履歴 <span class="mono">${hCount}</span> 件` +
+      `<br><span class="note">※履歴が増えるほど精度補正（位置クセ・相性・濃さ・ナンちゃん加点）が効く</span>`;
   }
 
-  // ===== 結果判定（ストレート＋セット両方）=====
+  // =========================================================
+  // 10) 結果判定（ストレート＋セット両方）
+  // =========================================================
   function judge(){
     const win = normalize4(document.getElementById("win").value);
     const out = document.getElementById("judgeOut");
@@ -391,27 +657,26 @@
       return;
     }
 
-    // まだ生成してない場合
     if(!STATE.topStraightRows || STATE.topStraightRows.length === 0){
       out.innerHTML = `<span class="warn">先に「番号を生成する」を押してね</span>`;
       return;
     }
 
     const axis = STATE.axis; // "72" など
-    const axisHit = (win.includes(axis[0]) && win.includes(axis[1])) || (win[0]+win[1]===axis);
+    const axisHit = win.includes(axis[0]) && win.includes(axis[1]);
 
     // ストレート：本命/保険/圏外
     const sMainHit = inGroup(win, STATE.straightMain);
     const sInsHit  = inGroup(win, STATE.straightIns);
     const sAnyHit  = inGroup(win, STATE.topStraightRows);
 
-    // セット：キー一致（順不同）
+    // セット：キー一致
     const winKey = setKey(win);
     const setMainHit = inGroup(winKey, STATE.setMain);
     const setInsHit  = inGroup(winKey, STATE.setIns);
     const setAnyHit  = inGroup(winKey, STATE.topSetRows);
 
-    // 一致度
+    // 一致度（惜しさ用）
     let bestPos = 0;
     let bestDigit = 0;
     for(const r of STATE.topStraightRows){
@@ -419,15 +684,13 @@
       bestDigit = Math.max(bestDigit, digitMatchCount(win, r.num));
     }
 
-    // セット一致度（順不同なのでdigitは常に4、キー一致以外は評価控えめ）
-    // ※セットは「キー一致」を強いシグナルとして扱う
-    const setHit = !!setAnyHit;
+    // “ナンちゃん加点的に”当選も見ておく（コメント用）
+    const nBonus = nanchanBonus(win);
 
-    // 判定ランク（ゆうちゃん向け：納得できるやつ）
+    // 判定ランク
     let headline = "";
     let detail = [];
 
-    // 最高：ストレート本命 or セット本命
     if(sMainHit || setMainHit){
       headline = "🔥 激アツ（読みが射程圏）";
     } else if(sInsHit || setInsHit){
@@ -440,11 +703,10 @@
       headline = "× ズレ（今日は流れ違い）";
     }
 
-    // 詳細
     detail.push(`当選：<span class="mono">${win}</span>`);
     detail.push(`軸：<span class="mono">${axis}</span>　/　軸一致：<span class="${axisHit?'ok':'warn'}">${axisHit?'○':'×'}</span>`);
+    detail.push(`ナンちゃん加点（当選側）：<span class="mono">+${nBonus.toFixed(1)}</span>`);
 
-    // ストレート詳細
     if(sMainHit){
       detail.push(`ストレート：<span class="ok">本命（強）</span>　${sMainHit.i}位`);
     } else if(sInsHit){
@@ -455,7 +717,6 @@
       detail.push(`ストレート：圏外（近さ：位置一致max ${bestPos}/4、数字一致max ${bestDigit}/4）`);
     }
 
-    // セット詳細（キー一致）
     if(setMainHit){
       detail.push(`セット：<span class="ok">本命（強）</span>　${setMainHit.i}位（キー ${winKey}）`);
     } else if(setInsHit){
@@ -470,6 +731,31 @@
       `<div class="big">${headline}</div>` +
       `<div style="margin-top:8px;line-height:1.7">${detail.map(x=>`・${x}`).join("<br>")}</div>`;
   }
+
+  // =========================================================
+  // 11) “設計図”の要点（ここはコード内メモ）
+  // =========================================================
+  /*
+    【🧠 100回データをどう評価に混ぜるか（設計図）】
+    1) 濃さ（freq）
+       - 直近ほど重く（0-9回:2.0 / 10-29回:1.0 / 30-99回:0.5）
+       - digitスコアの基礎にする（scoreDigits）
+
+    2) 位置クセ（posCount）
+       - 千/百/十/一ごとに、出やすい数字は“その位置”で加点
+       - rank()でposScoreとして加点
+
+    3) 相性（pairCount）
+       - 同じ回に一緒に出てるペアを“相性”として加点
+       - rank()でpairScoreとして加点
+
+    【🔥 ナンちゃん法則の数値化案（強化加点）】
+    - 表裏同居（0-5,1-6,2-7,3-8,4-9）: +4（2組以上なら追加+2）
+    - ダブル（00,11,...）: +3
+    - 1ズレ（差2 mod10）: +2
+    - 2ズレ（差3 mod10）: +2
+    ※“評価加点”としてrank()に合流 → 本命にも反映される
+  */
 </script>
 
 </body>
