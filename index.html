@@ -7,23 +7,16 @@
   <style>
     body{font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:16px;max-width:860px;margin:auto}
     h1{font-size:34px;margin:10px 0 18px}
-    input,textarea,button{font-size:16px;padding:12px;width:100%;box-sizing:border-box;margin:8px 0;border-radius:14px;border:1px solid #e5e5e5}
+    input,textarea,button,select{font-size:16px;padding:12px;width:100%;box-sizing:border-box;margin:8px 0;border-radius:14px;border:1px solid #e5e5e5}
     textarea{min-height:90px;resize:vertical}
-    button{background:#111;color:#fff;border:none;border-radius:999px;padding:16px;font-weight:900}
+    button{background:#111;color:#fff;border:none;border-radius:999px;padding:16px;font-weight:800}
     .box{background:#fafafa;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px}
-    .label{font-weight:900;margin-top:6px}
+    .label{font-weight:800;margin-top:6px}
     pre{white-space:pre-wrap;background:#f7f7f7;border-radius:14px;padding:12px;border:1px solid #eee}
-    .day{font-weight:900;margin:8px 0 0}
+    .day{font-weight:900;margin:8px 0 10px}
     .note{color:#666;font-size:12px;margin-top:6px;line-height:1.5}
     h2{margin-top:22px}
     h3{margin:12px 0 6px}
-    .resultBox{
-      background:#fff;border:1px solid #eee;border-radius:16px;padding:14px;margin-top:12px
-    }
-    .big{font-size:18px;font-weight:900}
-    .ok{color:#0a7;font-weight:900}
-    .warn{color:#b00020;font-weight:900}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;}
   </style>
 </head>
 <body>
@@ -32,23 +25,22 @@
 
   <div class="box">
     <div class="label">ヒント1（例：168 / 1・6・8）</div>
-    <input id="hint1" inputmode="numeric" placeholder="ヒント1 例：168">
+    <input id="hint1" inputmode="numeric" placeholder="ヒント1 例：168" />
 
     <div class="label">ヒント2（例：3920 / 3・9・2・0）</div>
-    <input id="hint2" inputmode="numeric" placeholder="ヒント2 例：3920">
+    <input id="hint2" inputmode="numeric" placeholder="ヒント2 例：3920" />
 
     <div class="label">前回（任意）</div>
-    <input id="prev" inputmode="numeric" placeholder="前回 例：5105" maxlength="4">
+    <input id="prev" inputmode="numeric" placeholder="前回 例：5105" maxlength="4" />
 
     <div class="label">前々回（任意）</div>
-    <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4">
+    <input id="prev2" inputmode="numeric" placeholder="前々回 例：4588" maxlength="4" />
 
-    <div class="label">直近10回（任意・コピペOK）</div>
+    <div class="label">直近10回（任意・4桁×10を貼る）</div>
     <textarea id="recent" placeholder="例：
 4141→2121→7202→7526→2300→7263→1632→6551→2827→2699"></textarea>
 
     <div class="note">
-      ※直近10回は<strong>手入力不要</strong>。ネットの結果を<strong>そのままコピーして貼るだけ</strong>でOK（文字は無視して数字だけ拾う）<br>
       ※同じ入力なら何回押しても同じ結果（ブレない）<br>
       ※18時ギリギリのリハーサル数字は入力しない（ゆうちゃん方針）
     </div>
@@ -56,420 +48,331 @@
     <button type="button" onclick="generate()">番号を生成する</button>
   </div>
 
-  <div class="resultBox">
-    <div class="label">当選番号（結果が出たらここに4桁）</div>
-    <input id="win" inputmode="numeric" placeholder="例：7263" maxlength="4">
-    <button type="button" onclick="judge()">結果を判定する</button>
-
-    <div id="judgeOut" class="mono" style="margin-top:10px;"></div>
-    <div class="note">※判定は「ストレート＋セット」両方を見る（ゆうちゃん指定）</div>
-  </div>
-
   <h2>ストレート（ランキング）</h2>
-  <div id="dayPower" class="day"></div>
+  <div id="dayPower" class="day">—</div>
 
   <h3>本命（強）</h3>
-  <pre id="straightMain">（ここに出ます）</pre>
+  <pre id="straightMain">（まだ）</pre>
 
   <h3>保険（中・弱）</h3>
-  <pre id="straightIns">（ここに出ます）</pre>
+  <pre id="straightIns">（まだ）</pre>
 
   <h2>セット（ランキング）</h2>
 
   <h3>本命（強）</h3>
-  <pre id="setMain">（ここに出ます）</pre>
+  <pre id="setMain">（まだ）</pre>
 
   <h3>保険（中・弱）</h3>
-  <pre id="setIns">（ここに出ます）</pre>
+  <pre id="setIns">（まだ）</pre>
 
 <script>
-  // ===== 設定：裏数字（ゆうちゃん定義）=====
-  const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4};
+/* =========================
+   0) 基本ユーティリティ
+========================= */
 
-  // ===== 状態保持（生成結果を判定に使う）=====
-  const STATE = {
-    axis: "48",
-    topStraightRows: [], // [{i,num,badge,label,sc}]
-    topSetRows: [],      // 同上（numはセットキー＝並べ替え）
-    straightMain: [],
-    straightIns: [],
-    setMain: [],
-    setIns: [],
+const ura = {0:5,5:0,1:6,6:1,2:7,7:2,3:8,8:3,4:9,9:4}; // 表↔裏
+
+function digitsOf(str){
+  return (str || "").match(/\d/g)?.map(Number) || [];
+}
+function uniq(arr){
+  return [...new Set(arr)];
+}
+function clampDigit(n){
+  n = Number(n);
+  if(Number.isNaN(n)) return 0;
+  n %= 10;
+  if(n < 0) n += 10;
+  return n;
+}
+
+/* 同じ入力→同じ乱数 */
+function hash32(str){
+  let h = 2166136261;
+  for(let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function mulberry32(seed){
+  return function(){
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function pick(pool, rand){
+  return pool[Math.floor(rand() * pool.length)];
+}
+
+/* =========================
+   1) ゆうちゃん方針：ヒントは必ず2つだけ
+   - 3つ以上入ってたら、材料から「強い2つ」を選んで圧縮
+========================= */
+
+function scoreDigits(){
+  const s = Array(10).fill(0);
+  digitsOf(document.getElementById("recent").value).forEach(d => s[d] += 1);
+  digitsOf(document.getElementById("prev").value).forEach(d => s[d] += 3);
+  digitsOf(document.getElementById("prev2").value).forEach(d => s[d] += 2);
+  return s;
+}
+
+function pick2FromHint(str, s, prevStr, prev2Str){
+  const raw = uniq(digitsOf(str));
+  // 0 or 1 のときは保険で埋める（※必ず2つ）
+  if(raw.length === 0) return [4,8];
+  if(raw.length === 1) return [raw[0], (raw[0] + 5) % 10];
+
+  const pull = new Set(uniq([...digitsOf(prevStr), ...digitsOf(prev2Str)]));
+
+  const scoreOne = (d) => {
+    let sc = 0;
+    sc += (s?.[d] ?? 0) * 10;             // 直近/前回/前々回の頻度
+    if(pull.has(d)) sc += 30;             // 引っ張り
+    // 足す9（同ヒント内で）
+    if(raw.some(x => x !== d && x + d === 9)) sc += 15;
+    // 連番（同ヒント内で）
+    if(raw.some(x => x !== d && Math.abs(x - d) === 1)) sc += 8;
+    // 裏数字（単体のクセとして少し）
+    sc += 2;
+    return sc;
   };
 
-  // ===== ユーティリティ =====
-  function digits(str){ return (str || "").match(/\d/g) || []; }
-  function uniq(arr){
-    const s = new Set(), out=[];
-    for(const x of arr){ if(!s.has(x)){ s.add(x); out.push(x); } }
-    return out;
+  // 2つだけ返す（これで必ず2つ）
+  const picked = raw.sort((a,b)=>scoreOne(b)-scoreOne(a)).slice(0,2);
+  return picked;
+}
+
+/* =========================
+   2) 軸決定：共通数字が軸（最優先）
+========================= */
+
+function chooseAxis(h1, h2, s){
+  const common = h1.filter(x => h2.includes(x));
+  if(common.length >= 2) return common.slice(0,2);
+
+  if(common.length === 1){
+    const rest = uniq([...h1, ...h2].filter(x => x !== common[0]));
+    const b = rest.sort((a,b)=> (s[b]??0) - (s[a]??0))[0] ?? common[0];
+    return [common[0], b];
   }
 
-  // 同じ入力なら同じ乱数列（固定）
-  function hash32(str){
-    let h = 2166136261;
-    for(let i=0;i<str.length;i++){
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-  function mulberry32(seed){
-    return function(){
-      let t = seed += 0x6D2B79F5;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-  function pick(pool, rand){
-    return pool[Math.floor(rand() * pool.length)];
-  }
+  // 共通なし：スコア上位から2つ
+  const all = uniq([...h1, ...h2]);
+  if(all.length >= 2) return all.sort((a,b)=> (s[b]??0)-(s[a]??0)).slice(0,2);
 
-  // ===== 材料スコア（直近/前回/前々回）=====
-  function scoreDigits(){
-    const s = Array(10).fill(0);
-    digits(document.getElementById("recent").value).forEach(x => s[+x] += 1);
-    digits(document.getElementById("prev").value).forEach(x => s[+x] += 3);
-    digits(document.getElementById("prev2").value).forEach(x => s[+x] += 2);
-    return s;
+  return [4,8];
+}
+
+/* =========================
+   3) プール生成（候補に使う数字の集合）
+   - ヒント2つ + 裏 + 連番±1 + 材料頻度重み
+========================= */
+
+function buildPool(h1, h2, s){
+  let p = [...h1, ...h2];
+
+  // 裏
+  for(const d of p){
+    p.push(ura[d]);
   }
 
-  // ===== 「必ず2つだけ」ヒント選抜（共通最優先）=====
-  function pick2FromHint(meStr, s, prevStr, prev2Str, otherStr){
-    const me = uniq(digits(meStr)).map(Number);
-    const other = new Set(uniq(digits(otherStr)).map(Number));
-
-    // 引っ張り集合
-    const pull = new Set( digits((prevStr||"") + (prev2Str||"")).map(Number) );
-
-    const score = (d) => {
-      let sc = 0;
-      sc += (s?.[d] ?? 0) * 10;      // 出現の濃さ
-      if (pull.has(d)) sc += 30;     // 引っ張り強め
-      sc += 2;                       // 基礎点
-      if (me.some(x => x !== d && x + d === 9)) sc += 15; // 足す9
-      if (me.some(x => x !== d && Math.abs(x - d) === 1)) sc += 8; // 連番
-      return sc;
-    };
-
-    // 共通を最優先で残す
-    const commons = me.filter(x => other.has(x));
-    if (commons.length >= 2){
-      return commons.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
-    }
-    if (commons.length === 1){
-      const rest = me.filter(x => x !== commons[0]).sort((a,b)=>score(b)-score(a));
-      const second = (rest[0] ?? commons[0]);
-      return [String(commons[0]), String(second)];
-    }
-
-    // 共通なし：スコア上位2つ（必ず2つ）
-    if (me.length >= 2){
-      return me.sort((a,b)=>score(b)-score(a)).slice(0,2).map(String);
-    }
-    if (me.length === 1){
-      const candidates = [...Array(10)].map((_,i)=>i).filter(x=>x!==me[0]);
-      candidates.sort((a,b)=>score(b)-score(a));
-      return [String(me[0]), String(candidates[0] ?? me[0])];
-    }
-    return ["4","8"]; // 空の保険
+  // 連番±1
+  for(const d of p){
+    p.push(clampDigit(d - 1));
+    p.push(clampDigit(d + 1));
   }
 
-  // ===== 軸2桁決定：間引く前の「共通」を最優先 =====
-  function chooseAxisFromRaw(h1raw, h2raw, s){
-    const a = uniq(digits(h1raw)).map(Number);
-    const b = uniq(digits(h2raw)).map(Number);
-    const setB = new Set(b);
-    const score = (d) => (s?.[d] ?? 0);
-
-    const commons = a.filter(x => setB.has(x));
-    if (commons.length >= 2){
-      commons.sort((x,y)=>score(y)-score(x));
-      return [String(commons[0]), String(commons[1])];
-    }
-    if (commons.length === 1){
-      const all = uniq([...a, ...b].filter(x => x !== commons[0]));
-      all.sort((x,y)=>score(y)-score(x));
-      const second = all[0] ?? commons[0];
-      return [String(commons[0]), String(second)];
-    }
-
-    const all = uniq([...a, ...b]);
-    all.sort((x,y)=>score(y)-score(x));
-    if (all.length >= 2) return [String(all[0]), String(all[1])];
-    return ["4","8"];
+  // スコア重み（頻度が高い数字を少し濃くする）
+  for(let d=0; d<=9; d++){
+    for(let i=0; i<(s[d]||0); i++) p.push(d);
   }
 
-  // ===== プール作成（重み付き：重複を残す）=====
-  function buildPoolWeighted(h1_2, h2_2, s){
-    let p = [];
-    p.push(...h1_2, ...h2_2);
+  return uniq(p).map(Number);
+}
 
-    // 裏数字（ヒント由来）
-    for(const x of [...h1_2, ...h2_2]){
-      const n = +x;
-      if (ura[n] !== undefined) p.push(String(ura[n]));
-    }
+/* =========================
+   4) ナンちゃん法則（評価加点）
+   - 表裏
+   - 1ズレ(±2)
+   - 2ズレ(±3)
+   - ダブル（同数字2個以上）
+   ※「評価」だけに使う（生成ロジックは崩さない）
+========================= */
 
-    // 連番（±1）
-    for(const x of [...h1_2, ...h2_2]){
-      const n = +x;
-      if(n > 0) p.push(String(n-1));
-      if(n < 9) p.push(String(n+1));
-    }
+function zure1(d){ return [clampDigit(d+2), clampDigit(d-2)]; } // 1ズレ
+function zure2(d){ return [clampDigit(d+3), clampDigit(d-3)]; } // 2ズレ
 
-    // スコア重み
-    for(let d=0; d<=9; d++){
-      const w = (s[d] ?? 0);
-      for(let i=0;i<w;i++) p.push(String(d));
-    }
+function makeMaterialSet(h1, h2){
+  const prev = digitsOf(document.getElementById("prev").value);
+  const prev2 = digitsOf(document.getElementById("prev2").value);
+  const recent = digitsOf(document.getElementById("recent").value);
+  const base = uniq([...h1, ...h2, ...prev, ...prev2, ...recent]);
+  return new Set(base);
+}
 
-    // 保険（最低限）
-    p.push("0","1","2","3","4","5","6","7","8","9");
-    return p;
+function nanchanBonus(numStr, materialSet){
+  const ds = numStr.split("").map(x=>Number(x));
+  const inNum = new Set(ds);
+
+  let bonus = 0;
+
+  // A) 表裏（材料の裏が入ってたら加点）
+  for(const m of materialSet){
+    const u = ura[m];
+    if(inNum.has(u)) bonus += 2;
   }
 
-  // ===== ランキング（足す9 / 連番）=====
-  function rank(nums){
-    return nums.map(n=>{
-      let sc=0;
-      const a = n.split("").map(Number);
-      for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
-        if(a[i]+a[j]===9) sc += 3;
-        if(Math.abs(a[i]-a[j])===1) sc += 2;
-      }
-      return { n, sc };
-    }).sort((A,B)=>B.sc - A.sc);
+  // B) 1ズレ（±2）
+  for(const m of materialSet){
+    const [a,b] = zure1(m);
+    if(inNum.has(a)) bonus += 2;
+    if(inNum.has(b)) bonus += 2;
   }
 
-  // 強さラベル（best比）
-  function tierLabel(score, best){
-    if(best <= 0) return { badge:"★", label:"弱" };
-    const r = score / best;
-    if(r >= 0.92) return { badge:"★★★", label:"強" };
-    if(r >= 0.86) return { badge:"★★",  label:"中" };
-    return { badge:"★",   label:"弱" };
+  // C) 2ズレ（±3）…少し弱め
+  for(const m of materialSet){
+    const [a,b] = zure2(m);
+    if(inNum.has(a)) bonus += 1;
+    if(inNum.has(b)) bonus += 1;
   }
 
-  function formatRows(rows){
-    if(!rows || rows.length === 0) return "（なし）";
-    return rows.map(x => `${x.i}位  ${x.badge} [${x.label}]  ${x.num}`).join("\n");
+  // D) ダブル（同数字2個以上）
+  const cnt = Array(10).fill(0);
+  ds.forEach(d=>cnt[d]++);
+  const maxSame = Math.max(...cnt);
+  if(maxSame >= 2) bonus += 2; // ダブル
+  if(maxSame === 3) bonus += 4; // トリプル
+  if(maxSame === 4) bonus += 6; // クアドラ
+
+  return bonus;
+}
+
+/* =========================
+   5) 既存評価（足す9 + 連番） + ナンちゃん加点
+========================= */
+
+function baseScore(numStr){
+  const a = numStr.split("").map(Number);
+  let sc = 0;
+  for(let i=0;i<4;i++) for(let j=i+1;j<4;j++){
+    if(a[i] + a[j] === 9) sc += 3;           // 足す9
+    if(Math.abs(a[i] - a[j]) === 1) sc += 2; // 連番
+  }
+  return sc;
+}
+
+function rank(nums, materialSet){
+  return nums.map(n=>{
+    const sc = baseScore(n) + nanchanBonus(n, materialSet);
+    return { n, sc };
+  }).sort((A,B)=>B.sc - A.sc);
+}
+
+/* =========================
+   6) 強/中/弱 表示
+========================= */
+
+function tierLabel(score, best){
+  if(best <= 0) return { badge:"★", label:"弱" };
+  const r = score / best;
+  if(r >= 0.92) return { badge:"★★★", label:"強" };
+  if(r >= 0.86) return { badge:"★★",  label:"中" };
+  return { badge:"★",   label:"弱" };
+}
+
+function splitRanked(ranked, limit = 10){
+  if(!ranked || ranked.length === 0) return { main: [], ins: [] };
+
+  const best = ranked[0].sc;
+  const rows = ranked.slice(0, limit).map((r, i) => {
+    const t = tierLabel(r.sc, best);
+    return { i:i+1, num:r.n, badge:t.badge, label:t.label };
+  });
+
+  return {
+    main: rows.filter(x => x.label === "強"),
+    ins : rows.filter(x => x.label !== "強")
+  };
+}
+
+function formatRows(rows){
+  if(!rows || rows.length === 0) return "（なし）";
+  return rows.map(x => `${x.i}位  ${x.badge}【${x.label}】  ${x.num}`).join("\n");
+}
+
+function judgeDayPower(count){
+  if(count <= 5) return "🔥 今日は強い日（集中勝負）";
+  if(count <= 8) return "◎ 普通の日（バランス）";
+  return "△ 分散の日（無理しない）";
+}
+
+/* =========================
+   7) 生成本体（同じ入力→同じ結果）
+========================= */
+
+function generate(){
+  // ① 材料スコア
+  const s = scoreDigits();
+
+  // ② ヒントは必ず2つに圧縮
+  const prevStr  = document.getElementById("prev").value;
+  const prev2Str = document.getElementById("prev2").value;
+
+  const h1 = pick2FromHint(document.getElementById("hint1").value, s, prevStr, prev2Str);
+  const h2 = pick2FromHint(document.getElementById("hint2").value, s, prevStr, prev2Str);
+
+  // ③ 軸（共通が最優先）
+  const axis = chooseAxis(h1, h2, s);
+
+  // ④ プール
+  const pool = buildPool(h1, h2, s);
+
+  // ⑤ シード（安定）
+  const seedStr =
+    document.getElementById("hint1").value + "|" +
+    document.getElementById("hint2").value + "|" +
+    document.getElementById("prev").value  + "|" +
+    document.getElementById("prev2").value + "|" +
+    document.getElementById("recent").value;
+
+  const rand = mulberry32(hash32(seedStr));
+
+  // ⑥ 候補100本（軸2桁 + 残り2桁をプールから）
+  let list = [];
+  while(list.length < 100){
+    let n = [axis[0], axis[1]];
+    while(n.length < 4) n.push(pick(pool, rand));
+    list.push(n.join(""));
   }
 
-  function splitRanked(ranked, limit=10){
-    if(!ranked || ranked.length === 0) return { main: [], ins: [], rows: [] };
-    const best = ranked[0].sc;
+  // ⑦ ランク（ナンちゃん法則：評価加点）
+  const materialSet = makeMaterialSet(h1, h2);
+  const ranked = rank(uniq(list), materialSet);
 
-    const rows = ranked.slice(0, limit).map((r, idx) => {
-      const t = tierLabel(r.sc, best);
-      return { i: idx+1, num: r.n, badge: t.badge, label: t.label, sc: r.sc };
-    });
+  // ⑧ まず上位10を表示用に使う
+  const top10 = ranked.slice(0, 10);
 
-    return {
-      rows,
-      main: rows.filter(x => x.label === "強"),
-      ins : rows.filter(x => x.label !== "強")
-    };
-  }
+  // ⑨ 強/中/弱で分けて表示（ストレート）
+  const sSplit = splitRanked(top10, 10);
+  document.getElementById("straightMain").textContent = formatRows(sSplit.main);
+  document.getElementById("straightIns").textContent  = formatRows(sSplit.ins);
 
-  // 「今日は強い日」：本命件数で判定
-  function judgeDayPower(mainCount){
-    if(mainCount >= 5) return "🔥 今日は強い日（集中勝負）";
-    if(mainCount >= 3) return "◎ 普通の日（バランス）";
-    return "△ 分散の日（無理しない）";
-  }
+  // ⑩ 「今日は強い日」：本命（強）の本数で判定
+  document.getElementById("dayPower").textContent =
+    judgeDayPower(sSplit.main.length);
 
-  // ===== 判定用ヘルパー =====
-  function normalize4(str){
-    const d = digits(str).slice(0,4);
-    if(d.length !== 4) return null;
-    return d.join("");
-  }
+  // ⑪ セット（並び替え1つをセット扱い）
+  const setNums = uniq(top10.map(r => r.n.split("").sort().join("")));
+  const setRanked = rank(setNums, materialSet).slice(0, 10);
+  const setSplit = splitRanked(setRanked, 10);
 
-  function posMatch(a,b){
-    let c=0;
-    for(let i=0;i<4;i++) if(a[i]===b[i]) c++;
-    return c;
-  }
-
-  // multisetの一致数（順不同）
-  function digitMatchCount(a,b){
-    const ca = Array(10).fill(0);
-    const cb = Array(10).fill(0);
-    for(const ch of a) ca[+ch]++;
-    for(const ch of b) cb[+ch]++;
-    let sum=0;
-    for(let i=0;i<10;i++) sum += Math.min(ca[i], cb[i]);
-    return sum;
-  }
-
-  function inGroup(num, groupRows){
-    return groupRows.find(r => r.num === num) || null;
-  }
-
-  function setKey(num){
-    return num.split("").sort().join("");
-  }
-
-  // ===== 生成本体 =====
-  function generate(){
-    const s = scoreDigits();
-
-    const prevStr  = document.getElementById("prev").value;
-    const prev2Str = document.getElementById("prev2").value;
-
-    const h1raw = document.getElementById("hint1").value;
-    const h2raw = document.getElementById("hint2").value;
-
-    // ヒントは必ず2つに矯正（共通優先）
-    const h1_2 = pick2FromHint(h1raw, s, prevStr, prev2Str, h2raw);
-    const h2_2 = pick2FromHint(h2raw, s, prevStr, prev2Str, h1raw);
-
-    // 軸は「間引く前の共通」を最優先
-    const axisArr = chooseAxisFromRaw(h1raw, h2raw, s);
-    const axis = axisArr[0] + axisArr[1];
-    STATE.axis = axis;
-
-    // プール（重み付き）
-    const pool = buildPoolWeighted(h1_2, h2_2, s);
-
-    // 入力全部からシード固定（同じ入力→同じ結果）
-    const seedStr =
-      h1raw + "|" + h2raw + "|" +
-      prevStr + "|" + prev2Str + "|" +
-      document.getElementById("recent").value;
-
-    const rand = mulberry32(hash32(seedStr));
-
-    // 候補100本（同じ入力なら同じ100本）
-    let list = [];
-    while(list.length < 100){
-      let n = [axisArr[0], axisArr[1]];
-      while(n.length < 4) n.push(pick(pool, rand));
-      list.push(n.join(""));
-    }
-
-    // ユニーク→ランク
-    const ranked = rank(uniq(list));
-    const top10 = ranked.slice(0, 10);
-    const sp = splitRanked(top10, 10);
-
-    document.getElementById("dayPower").textContent = judgeDayPower(sp.main.length);
-    document.getElementById("straightMain").textContent = formatRows(sp.main);
-    document.getElementById("straightIns").textContent  = formatRows(sp.ins);
-
-    // セット：top10をセットキーにしてランク
-    const setNums = uniq(top10.map(r => setKey(r.n)));
-    const setRanked = rank(setNums).slice(0,10);
-    const setSplit = splitRanked(setRanked, 10);
-
-    document.getElementById("setMain").textContent = formatRows(setSplit.main);
-    document.getElementById("setIns").textContent  = formatRows(setSplit.ins);
-
-    // STATE保存（判定で使う）
-    STATE.topStraightRows = sp.rows;
-    STATE.straightMain = sp.main;
-    STATE.straightIns = sp.ins;
-
-    STATE.topSetRows = setSplit.rows;
-    STATE.setMain = setSplit.main;
-    STATE.setIns = setSplit.ins;
-
-    // 生成直後は判定表示を軽くリセット
-    document.getElementById("judgeOut").innerHTML =
-      `<span class="ok">生成OK</span>（軸 <span class="mono">${STATE.axis}</span>）  結果が出たら当選番号を入れて「判定」してね。`;
-  }
-
-  // ===== 結果判定（ストレート＋セット両方）=====
-  function judge(){
-    const win = normalize4(document.getElementById("win").value);
-    const out = document.getElementById("judgeOut");
-
-    if(!win){
-      out.innerHTML = `<span class="warn">当選番号は4桁で入れてね</span>`;
-      return;
-    }
-
-    // まだ生成してない場合
-    if(!STATE.topStraightRows || STATE.topStraightRows.length === 0){
-      out.innerHTML = `<span class="warn">先に「番号を生成する」を押してね</span>`;
-      return;
-    }
-
-    const axis = STATE.axis; // "72" など
-    const axisHit = (win.includes(axis[0]) && win.includes(axis[1])) || (win[0]+win[1]===axis);
-
-    // ストレート：本命/保険/圏外
-    const sMainHit = inGroup(win, STATE.straightMain);
-    const sInsHit  = inGroup(win, STATE.straightIns);
-    const sAnyHit  = inGroup(win, STATE.topStraightRows);
-
-    // セット：キー一致（順不同）
-    const winKey = setKey(win);
-    const setMainHit = inGroup(winKey, STATE.setMain);
-    const setInsHit  = inGroup(winKey, STATE.setIns);
-    const setAnyHit  = inGroup(winKey, STATE.topSetRows);
-
-    // 一致度
-    let bestPos = 0;
-    let bestDigit = 0;
-    for(const r of STATE.topStraightRows){
-      bestPos = Math.max(bestPos, posMatch(win, r.num));
-      bestDigit = Math.max(bestDigit, digitMatchCount(win, r.num));
-    }
-
-    // セット一致度（順不同なのでdigitは常に4、キー一致以外は評価控えめ）
-    // ※セットは「キー一致」を強いシグナルとして扱う
-    const setHit = !!setAnyHit;
-
-    // 判定ランク（ゆうちゃん向け：納得できるやつ）
-    let headline = "";
-    let detail = [];
-
-    // 最高：ストレート本命 or セット本命
-    if(sMainHit || setMainHit){
-      headline = "🔥 激アツ（読みが射程圏）";
-    } else if(sInsHit || setInsHit){
-      headline = "◎ 惜しい（流れは合ってる）";
-    } else if(sAnyHit || setAnyHit || bestPos >= 3){
-      headline = "○ 流れOK（あと一歩）";
-    } else if(bestDigit >= 2 || axisHit){
-      headline = "△ 分散の日（無理しない）";
-    } else {
-      headline = "× ズレ（今日は流れ違い）";
-    }
-
-    // 詳細
-    detail.push(`当選：<span class="mono">${win}</span>`);
-    detail.push(`軸：<span class="mono">${axis}</span>　/　軸一致：<span class="${axisHit?'ok':'warn'}">${axisHit?'○':'×'}</span>`);
-
-    // ストレート詳細
-    if(sMainHit){
-      detail.push(`ストレート：<span class="ok">本命（強）</span>　${sMainHit.i}位`);
-    } else if(sInsHit){
-      detail.push(`ストレート：<span class="ok">保険（中・弱）</span>　${sInsHit.i}位`);
-    } else if(sAnyHit){
-      detail.push(`ストレート：<span class="ok">圏内</span>　${sAnyHit.i}位`);
-    } else {
-      detail.push(`ストレート：圏外（近さ：位置一致max ${bestPos}/4、数字一致max ${bestDigit}/4）`);
-    }
-
-    // セット詳細（キー一致）
-    if(setMainHit){
-      detail.push(`セット：<span class="ok">本命（強）</span>　${setMainHit.i}位（キー ${winKey}）`);
-    } else if(setInsHit){
-      detail.push(`セット：<span class="ok">保険（中・弱）</span>　${setInsHit.i}位（キー ${winKey}）`);
-    } else if(setAnyHit){
-      detail.push(`セット：<span class="ok">圏内</span>　${setAnyHit.i}位（キー ${winKey}）`);
-    } else {
-      detail.push(`セット：圏外（キー ${winKey}）`);
-    }
-
-    out.innerHTML =
-      `<div class="big">${headline}</div>` +
-      `<div style="margin-top:8px;line-height:1.7">${detail.map(x=>`・${x}`).join("<br>")}</div>`;
-  }
+  document.getElementById("setMain").textContent = formatRows(setSplit.main);
+  document.getElementById("setIns").textContent  = formatRows(setSplit.ins);
+}
 </script>
 
 </body>
